@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface MicIndicatorProps {
   state?: "listening" | "transcribing";
   seconds?: number;
   live?: boolean;
+  /** 0..1 — when provided, drives the waveform height directly. */
+  rms?: number;
 }
 
 const BAR_COUNT = 32;
@@ -12,23 +14,31 @@ export function MicIndicator({
   state = "listening",
   seconds = 3,
   live = true,
+  rms,
 }: MicIndicatorProps) {
   const [bars, setBars] = useState<number[]>(() =>
-    Array.from({ length: BAR_COUNT }, () => 0.2 + Math.random() * 0.6),
+    Array.from({ length: BAR_COUNT }, () => 0.15 + Math.random() * 0.5),
   );
+  const lastPushed = useRef(0);
 
   useEffect(() => {
     if (!live || state === "transcribing") return;
     const id = setInterval(() => {
-      setBars((prev) =>
-        prev.map((v) => {
-          const target = 0.15 + Math.random() * 0.85;
-          return v * 0.6 + target * 0.4;
-        }),
-      );
-    }, 70);
+      setBars((prev) => {
+        const rest = prev.slice(1);
+        // Energy level — either real RMS or synthetic wiggle.
+        const energy =
+          rms != null
+            ? Math.min(1, Math.max(0.05, rms * 3.5))
+            : 0.2 + Math.random() * 0.7;
+        // Smooth to prevent jitter.
+        const next = lastPushed.current * 0.4 + energy * 0.6;
+        lastPushed.current = next;
+        return [...rest, next];
+      });
+    }, 45);
     return () => clearInterval(id);
-  }, [live, state]);
+  }, [live, state, rms]);
 
   const mm = Math.floor(seconds / 60);
   const ss = (seconds % 60).toString().padStart(2, "0");
