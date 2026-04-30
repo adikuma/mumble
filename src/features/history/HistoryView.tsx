@@ -216,11 +216,13 @@ function TranscriptRow({
       onClick={onSelect}
       className={cn(
         "group border-border flex flex-col gap-1 border-b px-4 py-3 text-left transition-colors",
-        active ? "border-l-brand bg-muted/60 border-l-2" : "hover:bg-muted/50",
+        active
+          ? "border-l-foreground bg-muted/60 border-l-2"
+          : "hover:bg-muted/50",
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground font-mono text-[11px]">
+        <span className="text-muted-foreground text-xs">
           {formatRelative(transcript.createdAt)}
         </span>
         <Badge variant="muted">{formatDuration(transcript.durationSec)}</Badge>
@@ -245,7 +247,7 @@ function TranscriptDetail({
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-6 pt-6">
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground font-mono text-xs">
+          <span className="text-muted-foreground text-xs">
             {formatRelative(transcript.createdAt)}
           </span>
           <Badge variant="muted">
@@ -290,7 +292,7 @@ function TranscriptDetail({
 
       <div className="text-muted-foreground flex items-center justify-between px-6 py-3 text-xs">
         <span>Input: {transcript.inputDevice ?? "System Default"}</span>
-        <span className="font-mono">{transcript.model} · en</span>
+        <span>{transcript.model} · en</span>
       </div>
     </div>
   );

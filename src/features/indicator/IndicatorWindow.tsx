@@ -81,7 +81,7 @@ export function IndicatorWindow() {
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-transparent">
-      <MicIndicator state={uiState} seconds={seconds} live rms={rms} />
+      <MicIndicator state={uiState} seconds={seconds} rms={rms} />
     </div>
   );
 }

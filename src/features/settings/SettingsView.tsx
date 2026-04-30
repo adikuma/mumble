@@ -111,7 +111,7 @@ export function SettingsView() {
               label="Push-to-talk key"
               control={
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono">
+                  <Badge variant="outline">
                     {capturingKey ? "Press any key…" : formatHotkey(hotkey)}
                   </Badge>
                   <Button
@@ -192,7 +192,7 @@ export function SettingsView() {
                 <div className="text-sm font-medium">
                   {model?.name ?? "Parakeet-TDT v3 (English)"}
                 </div>
-                <div className="text-muted-foreground truncate font-mono text-[11px]">
+                <div className="text-muted-foreground truncate text-xs">
                   {model?.path ?? "%APPDATA%\\Mumble\\models"} ·{" "}
                   {model?.present ? "installed" : "not downloaded"}
                 </div>
@@ -244,7 +244,7 @@ function DevicePicker({
     <select
       value={value ?? ""}
       onChange={(e) => onChange(e.currentTarget.value || null)}
-      className="border-input bg-background focus-visible:ring-ring h-8 max-w-[240px] truncate rounded-md border px-2 font-mono text-xs focus-visible:ring-2 focus-visible:outline-none"
+      className="border-input bg-background focus-visible:ring-ring h-9 max-w-[240px] truncate rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none"
     >
       <option value="">System Default</option>
       {devices.map((d) => (
@@ -295,7 +295,7 @@ function MeterPreview() {
             key={i}
             className={
               lit
-                ? "bg-brand w-[3px] rounded-sm"
+                ? "bg-foreground w-[3px] rounded-sm"
                 : "bg-muted-foreground/40 w-[3px] rounded-sm"
             }
             style={{ height: `${30 + i * 10}%` }}

@@ -3,7 +3,6 @@ import { Sidebar, type View } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HistoryView } from "@/features/history/HistoryView";
 import { SettingsView } from "@/features/settings/SettingsView";
-import { MicIndicator } from "@/features/indicator/MicIndicator";
 import { IndicatorWindow } from "@/features/indicator/IndicatorWindow";
 import { useBackendBridge } from "@/lib/useBackendBridge";
 import { useMumbleStore } from "@/store";
@@ -26,7 +25,6 @@ function MainWindow() {
 
   const [view, setView] = useState<View>("history");
   const [collapsed, setCollapsed] = useState(false);
-  const [showIndicatorPreview, setShowIndicatorPreview] = useState(false);
 
   const appState = useMumbleStore((s) => s.appState);
   const settings = useMumbleStore((s) => s.settings);
@@ -63,12 +61,12 @@ function MainWindow() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold capitalize">{view}</span>
             {appState !== "idle" && appState !== "paused" && (
-              <span className="text-muted-foreground font-mono text-[11px]">
+              <span className="text-muted-foreground text-xs">
                 · {appState}
               </span>
             )}
             {download && (
-              <span className="text-muted-foreground font-mono text-[11px]">
+              <span className="text-muted-foreground text-xs">
                 · downloading {download.filename} (
                 {Math.round(
                   (download.downloaded / Math.max(1, download.total)) * 100,
@@ -77,16 +75,7 @@ function MainWindow() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowIndicatorPreview((v) => !v)}
-              className="text-muted-foreground hover:bg-muted rounded-md px-2 py-1 font-mono text-[11px]"
-              aria-label="Toggle mic preview"
-            >
-              {showIndicatorPreview ? "Hide preview" : "Preview mic"}
-            </button>
-            <ThemeToggle />
-          </div>
+          <ThemeToggle />
         </header>
 
         <div className="min-h-0 flex-1">
@@ -94,13 +83,7 @@ function MainWindow() {
         </div>
       </main>
 
-      {showIndicatorPreview && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-20 flex justify-center">
-          <MicIndicator state="listening" seconds={3} />
-        </div>
-      )}
-
-      <Toaster position="bottom-right" richColors />
+      <Toaster position="bottom-right" />
     </div>
   );
 }
