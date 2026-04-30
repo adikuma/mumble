@@ -12,15 +12,39 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Mumble",
         "width": 960,
         "height": 640,
         "minWidth": 720,
         "minHeight": 480,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": true,
+        "url": "index.html"
+      },
+      {
+        "label": "indicator",
+        "title": "Mumble Indicator",
+        "width": 340,
+        "height": 80,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false,
+        "shadow": false,
+        "url": "index.html#/indicator"
       }
     ],
+    "trayIcon": {
+      "id": "mumble-tray",
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true,
+      "tooltip": "Mumble — hold Right Ctrl to dictate"
+    },
     "security": {
       "csp": null
     }

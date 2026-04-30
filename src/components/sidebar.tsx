@@ -31,15 +31,11 @@ export function Sidebar({ view, onChange, hotkey, collapsed }: SidebarProps) {
           collapsed && "justify-center px-2",
         )}
       >
-        <div className="bg-brand text-brand-foreground flex h-7 w-7 items-center justify-center rounded-md">
-          <Mic className="h-4 w-4" />
-        </div>
+        <Mic className="text-foreground h-5 w-5 shrink-0" />
         {!collapsed && (
           <div className="flex flex-col leading-tight">
             <span className="text-sm font-semibold">Mumble</span>
-            <span className="text-muted-foreground font-mono text-[10px]">
-              v0.1.0
-            </span>
+            <span className="text-muted-foreground text-[10px]">v0.1.0</span>
           </div>
         )}
       </div>
@@ -71,9 +67,7 @@ export function Sidebar({ view, onChange, hotkey, collapsed }: SidebarProps) {
         <div className="border-sidebar-border border-t p-3">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground text-xs">Push-to-talk</span>
-            <Badge variant="outline" className="font-mono">
-              {hotkey}
-            </Badge>
+            <Badge variant="outline">{hotkey}</Badge>
           </div>
         </div>
       )}
