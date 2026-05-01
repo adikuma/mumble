@@ -2,28 +2,22 @@ import { create } from "zustand";
 import type { AppState, Settings, Transcript } from "@/lib/tauri";
 
 interface MumbleStore {
-  // Pipeline state
   appState: AppState;
   modelReady: boolean;
   error: string | null;
 
-  // Settings (reflected from backend)
   settings: Settings | null;
 
-  // History
   transcripts: Transcript[];
-  historyQuery: string;
   selectedId: string | null;
   historyLoading: boolean;
 
-  // Download progress (first-run model)
   download: {
     filename: string;
     downloaded: number;
     total: number;
   } | null;
 
-  // Actions
   setAppState: (s: AppState) => void;
   setModelReady: (ready: boolean) => void;
   setError: (msg: string | null) => void;
@@ -32,7 +26,6 @@ interface MumbleStore {
   addTranscript: (t: Transcript) => void;
   removeTranscript: (id: string) => void;
   clearTranscripts: () => void;
-  setHistoryQuery: (q: string) => void;
   setSelectedId: (id: string | null) => void;
   setHistoryLoading: (loading: boolean) => void;
   setDownload: (d: MumbleStore["download"]) => void;
@@ -44,7 +37,6 @@ export const useMumbleStore = create<MumbleStore>((set) => ({
   error: null,
   settings: null,
   transcripts: [],
-  historyQuery: "",
   selectedId: null,
   historyLoading: false,
   download: null,
@@ -76,7 +68,6 @@ export const useMumbleStore = create<MumbleStore>((set) => ({
       };
     }),
   clearTranscripts: () => set({ transcripts: [], selectedId: null }),
-  setHistoryQuery: (historyQuery) => set({ historyQuery }),
   setSelectedId: (selectedId) => set({ selectedId }),
   setHistoryLoading: (historyLoading) => set({ historyLoading }),
   setDownload: (download) => set({ download }),

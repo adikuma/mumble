@@ -1,13 +1,15 @@
-//! Download + verify Parakeet-TDT v3 ONNX assets on first run.
+//! download parakeet tdt v3 onnx assets from huggingface on first run.
 //!
-//! Assets ship as a tarball/zip on HuggingFace. We keep it simple: a list of
-//! individual URLs + sha256 digests, downloaded in sequence with progress
-//! events forwarded to the frontend.
+//! hex's equivalent (`Hex/Clients/ParakeetClipPreparer.swift` in the cloned
+//! reference) similarly relies on plain https to fetch the model. we don't
+//! verify a sha256 here. the previous implementation hashed bytes but
+//! never finalized or compared, so it was a no op anyway. if integrity
+//! becomes a real concern we'll add expected digests per asset and verify.
+//! for now we trust the https connection to huggingface.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
 
@@ -85,14 +87,12 @@ async fn download_one(
 
     let tmp_path = out_path.with_extension("partial");
     let mut file = tokio::fs::File::create(&tmp_path).await?;
-    let mut hasher = Sha256::new();
     let mut stream = resp.bytes_stream();
     let mut downloaded: u64 = 0;
 
     use tokio::io::AsyncWriteExt;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
-        hasher.update(&chunk);
         file.write_all(&chunk).await?;
         downloaded += chunk.len() as u64;
         app.emit(
@@ -125,7 +125,6 @@ async fn download_one(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub fn delete_model(dir: &std::path::Path) -> Result<()> {
     if !dir.exists() {
         return Ok(());
@@ -137,10 +136,4 @@ pub fn delete_model(dir: &std::path::Path) -> Result<()> {
         }
     }
     Ok(())
-}
-
-// Keep `anyhow!` used even if the Windows check below is removed.
-#[allow(dead_code)]
-fn _force_anyhow_use() -> anyhow::Error {
-    anyhow!("unused")
 }

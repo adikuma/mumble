@@ -1,12 +1,14 @@
 use serde::Serialize;
 use std::sync::atomic::{AtomicU8, Ordering};
 
-/// High-level app state, shared across the backend.
+/// high level app state, shared across the backend.
 ///
-/// Transitions are linear:
-///   Idle -> Recording -> Transcribing -> Pasting -> Idle
+/// transitions are linear:
+///   idle then recording then transcribing then pasting then idle
 ///
-/// A bad-hotkey press or a sub-threshold clip short-circuits back to Idle.
+/// an unrecognised hotkey press or a sub threshold clip short circuits back
+/// to idle. "paused" is a settings field, not a state. when paused, hotkey
+/// presses are ignored but the state machine stays idle.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AppState {
@@ -14,7 +16,6 @@ pub enum AppState {
     Recording = 1,
     Transcribing = 2,
     Pasting = 3,
-    Paused = 4,
 }
 
 impl AppState {
@@ -23,13 +24,12 @@ impl AppState {
             1 => AppState::Recording,
             2 => AppState::Transcribing,
             3 => AppState::Pasting,
-            4 => AppState::Paused,
             _ => AppState::Idle,
         }
     }
 }
 
-/// Lock-free state holder — hotkey thread reads, worker writes.
+/// lock free state holder. hotkey thread reads, worker writes.
 pub struct SharedState {
     inner: AtomicU8,
 }

@@ -1,0 +1,163 @@
+/* Shared base for all preview/* cards */
+@import url("../colors_and_type.css");
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 700px;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background: var(--background);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+body {
+  padding: 20px;
+}
+
+.card-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* primitive recreations (shadcn New York) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+.btn[data-size="sm"] { height: 32px; padding: 0 12px; font-size: 12px; }
+.btn[data-size="icon"] { width: 36px; height: 36px; padding: 0; }
+.btn[data-variant="default"]   { background: var(--primary); color: var(--primary-foreground); }
+.btn[data-variant="secondary"] { background: var(--secondary); color: var(--secondary-foreground); }
+.btn[data-variant="outline"]   { background: var(--background); color: var(--foreground); border-color: var(--input); }
+.btn[data-variant="ghost"]     { background: transparent; color: var(--foreground); }
+.btn[data-variant="destructive"] { background: var(--destructive); color: var(--destructive-foreground); }
+.btn[data-variant="link"]      { background: transparent; color: var(--foreground); padding: 0; height: auto; text-decoration: underline; text-underline-offset: 4px; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.badge[data-variant="default"] { background: var(--secondary); color: var(--secondary-foreground); }
+.badge[data-variant="outline"] { background: transparent; color: var(--foreground); border-color: var(--border); }
+.badge[data-variant="muted"]   { background: var(--muted); color: var(--muted-foreground); }
+
+.input {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--input);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.input::placeholder { color: var(--muted-foreground); }
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--card-foreground);
+}
+
+.swatch-row { display: flex; gap: 10px; }
+.swatch {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swatch-chip {
+  height: 56px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.swatch-name { font-size: 11px; font-weight: 500; }
+.swatch-meta { font-size: 10px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.muted { color: var(--muted-foreground); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+/* dark preview frame */
+.dark-frame {
+  background: hsl(240 10% 3.9%);
+  color: hsl(0 0% 98%);
+  border-radius: 8px;
+  padding: 14px;
+  border: 1px solid hsl(240 3.7% 15.9%);
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--input);
+  transition: background 150ms;
+  flex-shrink: 0;
+}
+.switch[data-checked="true"] { background: var(--primary); }
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  background: var(--background);
+  border-radius: 999px;
+  transition: transform 150ms;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.switch[data-checked="true"]::after { transform: translateX(16px); }
+
+.divider { height: 1px; background: var(--border); width: 100%; }

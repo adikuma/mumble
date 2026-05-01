@@ -13,8 +13,8 @@ import {
 import { useMumbleStore } from "@/store";
 
 /**
- * Subscribes the Zustand store to backend events and loads initial state.
- * Mount once, at the top of the main window.
+ * subscribes the zustand store to backend events and loads initial state.
+ * mount once, at the top of the main window.
  */
 export function useBackendBridge() {
   const setAppState = useMumbleStore((s) => s.setAppState);
@@ -34,7 +34,7 @@ export function useBackendBridge() {
 
     (async () => {
       try {
-        const [settings] = await Promise.all([getSettings()]);
+        const settings = await getSettings();
         if (!cancelled) setSettings(settings);
       } catch (err) {
         if (!cancelled) setError((err as Error).message ?? String(err));

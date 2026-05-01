@@ -14,7 +14,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>({
 
 export function ThemeProvider({
   children,
-  defaultTheme = "dark",
+  defaultTheme = "system",
   storageKey = "mumble-theme",
 }: {
   children: React.ReactNode;

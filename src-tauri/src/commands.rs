@@ -1,12 +1,13 @@
-//! All `#[tauri::command]` handlers the frontend can invoke.
+//! all `#[tauri::command]` handlers the frontend can invoke.
 
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::audio;
-use crate::history::{HistoryStore, Transcript};
-use crate::hotkey;
+use crate::history::{HistoryStore, InsightsData, Transcript};
+use crate::hotkey::HotkeyListener;
 use crate::model_download;
 use crate::paste;
 use crate::pipeline::Pipeline;
@@ -31,10 +32,12 @@ pub fn get_settings(store: State<'_, SettingsStore>) -> Settings {
 
 #[tauri::command]
 pub fn update_settings(
+    app: AppHandle,
     store: State<'_, SettingsStore>,
     patch: serde_json::Value,
 ) -> Result<Settings, String> {
-    store
+    let prev = store.get();
+    let next = store
         .update(|s| {
             if let Some(v) = patch.get("hotkey").and_then(|x| x.as_str()) {
                 s.hotkey = v.to_string();
@@ -54,8 +57,36 @@ pub fn update_settings(
             if let Some(v) = patch.get("paused").and_then(|x| x.as_bool()) {
                 s.paused = v;
             }
+            if let Some(v) = patch.get("preRollMs").and_then(|x| x.as_u64()) {
+                s.pre_roll_ms = v as u32;
+            }
+            if let Some(v) = patch.get("autoPaste").and_then(|x| x.as_bool()) {
+                s.auto_paste = v;
+            }
         })
-        .map_err(err)
+        .map_err(err)?;
+
+    // reconcile autostart with the os if the toggle changed.
+    if prev.launch_at_login != next.launch_at_login {
+        let manager = app.autolaunch();
+        let result = if next.launch_at_login {
+            manager.enable()
+        } else {
+            manager.disable()
+        };
+        if let Err(e) = result {
+            tracing::warn!(?e, "autostart toggle failed");
+        }
+    }
+
+    // live rebind the hotkey listener if the user picked a new key.
+    if prev.hotkey != next.hotkey {
+        if let Some(listener) = app.try_state::<HotkeyListener>() {
+            listener.rebind(next.hotkey.clone());
+        }
+    }
+
+    Ok(next)
 }
 
 #[tauri::command]
@@ -73,8 +104,10 @@ pub fn list_input_devices() -> Result<Vec<DeviceInfo>, String> {
 }
 
 #[tauri::command]
-pub fn capture_hotkey() -> Result<String, String> {
-    hotkey::capture_next_key().ok_or_else(|| "timed out waiting for key press".to_string())
+pub fn capture_hotkey(listener: State<'_, HotkeyListener>) -> Result<String, String> {
+    listener
+        .capture_next()
+        .ok_or_else(|| "timed out waiting for key press".to_string())
 }
 
 #[tauri::command]
@@ -160,6 +193,14 @@ pub fn model_status() -> Result<ModelStatus, String> {
         path: dir.to_string_lossy().to_string(),
         name: "Parakeet-TDT v3 (English, int8)".into(),
     })
+}
+
+#[tauri::command]
+pub fn get_insights(
+    history: State<'_, HistoryStore>,
+    range_days: Option<u32>,
+) -> Result<InsightsData, String> {
+    history.insights(range_days.unwrap_or(7)).map_err(err)
 }
 
 #[derive(Serialize)]

@@ -21,6 +21,7 @@
         "resizable": true,
         "fullscreen": false,
         "visible": true,
+        "decorations": false,
         "url": "index.html"
       },
       {
@@ -43,7 +44,7 @@
       "id": "mumble-tray",
       "iconPath": "icons/32x32.png",
       "iconAsTemplate": true,
-      "tooltip": "Mumble — hold Right Ctrl to dictate"
+      "tooltip": "Mumble — hold your hotkey to dictate"
     },
     "security": {
       "csp": null

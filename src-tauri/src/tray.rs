@@ -1,7 +1,7 @@
-//! System tray icon + menu.
+//! system tray icon and menu.
 //!
-//! Left-click toggles the main window. Right-click opens a menu with
-//! Open / Pause-Resume / Quit. The icon itself is static in v1; state
+//! left click toggles the main window. right click opens a menu with
+//! open, pause or resume, quit. the icon itself is static in v1. state
 //! indication is delegated to the floating indicator window.
 
 use anyhow::Result;

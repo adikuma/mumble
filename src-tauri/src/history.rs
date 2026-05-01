@@ -1,8 +1,16 @@
+//! local sqlite history and insights aggregations.
+//!
+//! privacy first. nothing leaves this file. same path hex takes (transcripts
+//! land in `~/Library/Application Support/Hex/transcripts.db` over there).
+//! we keep ours at `%APPDATA%\Mumble\history.db`. the insights view queries
+//! this same table. no separate telemetry pipeline.
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
 use rusqlite::{params, Connection};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::paths;
@@ -16,6 +24,39 @@ pub struct Transcript {
     pub text: String,
     pub input_device: Option<String>,
     pub model: String,
+    /// wall clock latency from hotkey release to paste completed. optional
+    /// because (a) old rows from before this column existed may be `NULL`,
+    /// (b) `auto_paste = false` rows have no paste step.
+    pub latency_ms: Option<i64>,
+    /// foreground app exe name at paste time (e.g. `notepad.exe`). `NULL` when
+    /// `auto_paste` is off or the capture failed.
+    pub target_app: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightsData {
+    pub words: u64,
+    pub sessions: u64,
+    pub avg_latency_ms: Option<u64>,
+    pub time_saved_sec: f64,
+    pub daily_activity: Vec<DailyBucket>,
+    pub top_apps: Vec<TopEntry>,
+    pub top_words: Vec<TopEntry>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyBucket {
+    pub day: String,
+    pub count: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopEntry {
+    pub label: String,
+    pub count: u64,
 }
 
 #[derive(Clone)]
@@ -28,6 +69,8 @@ impl HistoryStore {
         let path = paths::history_db_path()?;
         let conn = Connection::open(&path)
             .with_context(|| format!("open sqlite at {}", path.display()))?;
+
+        // fresh dbs get the full schema. existing dbs get migrated below.
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS transcripts (
@@ -36,12 +79,16 @@ impl HistoryStore {
                 duration_sec REAL NOT NULL,
                 text TEXT NOT NULL,
                 input_device TEXT,
-                model TEXT NOT NULL
+                model TEXT NOT NULL,
+                latency_ms INTEGER,
+                target_app TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_transcripts_created_at
                 ON transcripts(created_at DESC);
             "#,
         )?;
+        migrate(&conn)?;
+
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
@@ -50,8 +97,8 @@ impl HistoryStore {
     pub fn insert(&self, t: &Transcript) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
-            "INSERT INTO transcripts (id, created_at, duration_sec, text, input_device, model)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO transcripts (id, created_at, duration_sec, text, input_device, model, latency_ms, target_app)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 t.id,
                 t.created_at.to_rfc3339(),
@@ -59,6 +106,8 @@ impl HistoryStore {
                 t.text,
                 t.input_device,
                 t.model,
+                t.latency_ms,
+                t.target_app,
             ],
         )?;
         Ok(())
@@ -68,7 +117,7 @@ impl HistoryStore {
         let conn = self.conn.lock();
         let (sql, like_param): (&str, String) = match query {
             Some(q) if !q.trim().is_empty() => (
-                "SELECT id, created_at, duration_sec, text, input_device, model
+                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app
                  FROM transcripts
                  WHERE text LIKE ?1
                  ORDER BY created_at DESC
@@ -76,7 +125,7 @@ impl HistoryStore {
                 format!("%{}%", q),
             ),
             _ => (
-                "SELECT id, created_at, duration_sec, text, input_device, model
+                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app
                  FROM transcripts
                  ORDER BY created_at DESC
                  LIMIT ?2",
@@ -86,17 +135,7 @@ impl HistoryStore {
 
         let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map(params![like_param, limit], |row| {
-            let created_at: String = row.get(1)?;
-            Ok(Transcript {
-                id: row.get(0)?,
-                created_at: DateTime::parse_from_rfc3339(&created_at)
-                    .map(|d| d.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now()),
-                duration_sec: row.get(2)?,
-                text: row.get(3)?,
-                input_device: row.get(4)?,
-                model: row.get(5)?,
-            })
+            row_to_transcript(row)
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .context("collect transcript rows")
@@ -117,24 +156,170 @@ impl HistoryStore {
     pub fn get(&self, id: &str) -> Result<Option<Transcript>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, created_at, duration_sec, text, input_device, model
+            "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app
              FROM transcripts WHERE id = ?1",
         )?;
         let mut rows = stmt.query(params![id])?;
         if let Some(row) = rows.next()? {
-            let created_at: String = row.get(1)?;
-            Ok(Some(Transcript {
-                id: row.get(0)?,
-                created_at: DateTime::parse_from_rfc3339(&created_at)
-                    .map(|d| d.with_timezone(&Utc))
-                    .unwrap_or_else(|_| Utc::now()),
-                duration_sec: row.get(2)?,
-                text: row.get(3)?,
-                input_device: row.get(4)?,
-                model: row.get(5)?,
-            }))
+            Ok(Some(row_to_transcript(row)?))
         } else {
             Ok(None)
         }
     }
+
+    /// aggregate metrics for the last `range_days` days. computed in rust
+    /// (rather than sql) because we tokenize transcript text for word stats.
+    pub fn insights(&self, range_days: u32) -> Result<InsightsData> {
+        let cutoff = Utc::now() - chrono::Duration::days(range_days as i64);
+        let cutoff_str = cutoff.to_rfc3339();
+
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT created_at, duration_sec, text, latency_ms, target_app
+             FROM transcripts
+             WHERE created_at >= ?1",
+        )?;
+        let rows = stmt
+            .query_map(params![cutoff_str], |row| {
+                Ok(InsightRow {
+                    created_at: row.get(0)?,
+                    duration_sec: row.get(1)?,
+                    text: row.get(2)?,
+                    latency_ms: row.get(3)?,
+                    target_app: row.get(4)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        drop(conn);
+
+        let sessions = rows.len() as u64;
+        let mut total_words: u64 = 0;
+        let mut total_duration: f64 = 0.0;
+        let mut latencies: Vec<i64> = Vec::new();
+        let mut app_counts: HashMap<String, u64> = HashMap::new();
+        let mut word_counts: HashMap<String, u64> = HashMap::new();
+        let mut day_counts: HashMap<String, u64> = HashMap::new();
+
+        for row in &rows {
+            total_duration += row.duration_sec;
+            if let Some(ms) = row.latency_ms {
+                latencies.push(ms);
+            }
+            if let Some(app) = &row.target_app {
+                *app_counts.entry(app.clone()).or_default() += 1;
+            }
+
+            // word totals and per word frequency for top words.
+            for raw in row.text.split_whitespace() {
+                total_words += 1;
+                let cleaned: String = raw
+                    .trim_matches(|c: char| !c.is_alphabetic())
+                    .to_lowercase();
+                if cleaned.is_empty() || STOPWORDS.contains(&cleaned.as_str()) {
+                    continue;
+                }
+                *word_counts.entry(cleaned).or_default() += 1;
+            }
+
+            // daily bucket. take the date prefix from rfc3339.
+            if let Some(date) = row.created_at.get(..10) {
+                *day_counts.entry(date.to_string()).or_default() += 1;
+            }
+        }
+
+        let avg_latency_ms = if latencies.is_empty() {
+            None
+        } else {
+            let sum: i64 = latencies.iter().sum();
+            let avg = sum / latencies.len() as i64;
+            Some(avg.max(0) as u64)
+        };
+
+        let top_apps = top_n(app_counts, 4);
+        let top_words = top_n(word_counts, 4);
+
+        // build last n days window with zeros filled in.
+        let mut daily_activity = Vec::with_capacity(range_days as usize);
+        for i in (0..range_days as i64).rev() {
+            let day = (Utc::now() - chrono::Duration::days(i))
+                .format("%Y-%m-%d")
+                .to_string();
+            let count = day_counts.get(&day).copied().unwrap_or(0);
+            daily_activity.push(DailyBucket { day, count });
+        }
+
+        Ok(InsightsData {
+            words: total_words,
+            sessions,
+            avg_latency_ms,
+            time_saved_sec: total_duration,
+            daily_activity,
+            top_apps,
+            top_words,
+        })
+    }
 }
+
+struct InsightRow {
+    created_at: String,
+    duration_sec: f64,
+    text: String,
+    latency_ms: Option<i64>,
+    target_app: Option<String>,
+}
+
+fn top_n(counts: HashMap<String, u64>, n: usize) -> Vec<TopEntry> {
+    let mut entries: Vec<TopEntry> = counts
+        .into_iter()
+        .map(|(label, count)| TopEntry { label, count })
+        .collect();
+    entries.sort_by(|a, b| b.count.cmp(&a.count));
+    entries.truncate(n);
+    entries
+}
+
+fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
+    let created_at: String = row.get(1)?;
+    Ok(Transcript {
+        id: row.get(0)?,
+        created_at: DateTime::parse_from_rfc3339(&created_at)
+            .map(|d| d.with_timezone(&Utc))
+            .unwrap_or_else(|_| Utc::now()),
+        duration_sec: row.get(2)?,
+        text: row.get(3)?,
+        input_device: row.get(4)?,
+        model: row.get(5)?,
+        latency_ms: row.get(6)?,
+        target_app: row.get(7)?,
+    })
+}
+
+fn migrate(conn: &Connection) -> Result<()> {
+    let cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(transcripts)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    if !cols.iter().any(|c| c == "latency_ms") {
+        conn.execute(
+            "ALTER TABLE transcripts ADD COLUMN latency_ms INTEGER",
+            [],
+        )?;
+    }
+    if !cols.iter().any(|c| c == "target_app") {
+        conn.execute("ALTER TABLE transcripts ADD COLUMN target_app TEXT", [])?;
+    }
+    Ok(())
+}
+
+const STOPWORDS: &[&str] = &[
+    "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "i", "you", "he", "she",
+    "it", "we", "they", "this", "that", "to", "of", "in", "on", "for", "with", "as", "at", "by",
+    "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "should",
+    "can", "could", "may", "might", "must", "not", "no", "so", "if", "then", "than", "from",
+    "into", "out", "up", "down", "very", "just", "about", "what", "when", "where", "how", "who",
+    "why", "which", "these", "those", "my", "your", "their", "our", "us", "them", "him", "her",
+    "his", "its", "any", "all", "some", "one", "two", "three", "four", "five", "yeah", "okay",
+    "ok", "right", "well", "like",
+];

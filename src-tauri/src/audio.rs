@@ -1,12 +1,12 @@
-//! Audio capture + pre-roll ring buffer.
+//! audio capture and pre roll ring buffer.
 //!
-//! Uses cpal in default config (WASAPI shared-mode on Windows).
-//! Continuously runs the input stream while the app is alive, pushing samples
-//! into a ring buffer. When recording starts, we begin appending to an in-memory
-//! Vec _plus_ we prepend the last ~0.45 s already in the ring buffer — this is
-//! Hex's trick for never clipping the first syllable.
+//! uses cpal in default config (wasapi shared mode on windows).
+//! continuously runs the input stream while the app is alive, pushing samples
+//! into a ring buffer. when recording starts, we begin appending to an in
+//! memory `Vec` and prepend the last ~0.45 s already in the ring buffer.
+//! this is hex's trick for never clipping the first syllable.
 //!
-//! On stop, we mono-downmix + resample to 16 kHz and return a Vec<f32>.
+//! on stop, we mono downmix and resample to 16 kHz and return a `Vec<f32>`.
 
 use anyhow::{anyhow, Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -16,7 +16,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 const TARGET_SAMPLE_RATE: u32 = 16_000;
-const PREROLL_SECONDS: f32 = 0.45;
+/// maximum pre roll the ring buffer supports. the user selected pre roll
+/// (via `Settings.preRollMs`) is clamped to this value so the buffer always
+/// has enough warm samples even on the highest setting.
 const RING_SECONDS: f32 = 1.0;
 
 pub struct CaptureDevice {
@@ -55,21 +57,23 @@ fn pick_device(host: &cpal::Host, name: Option<&str>) -> Result<Device> {
         .ok_or_else(|| anyhow!("no default input device"))
 }
 
-/// Runs for the life of the app. The inner stream is held alive via `_stream`
-/// because cpal stops capture when the Stream is dropped.
+/// runs for the life of the app. the inner stream is held alive via the
+/// `stream` field because cpal stops capture when the `Stream` is dropped.
 pub struct CaptureEngine {
-    _stream: Stream,
+    #[allow(dead_code)]
+    stream: Stream,
     ring: Arc<Mutex<RingBuffer>>,
     recording_buf: Arc<Mutex<Vec<f32>>>,
     recording: Arc<AtomicBool>,
     source_rate: u32,
     source_channels: u16,
-    meter: Arc<AtomicU64>, // f32 bits of current RMS
+    /// f32 bits of current rms.
+    meter: Arc<AtomicU64>,
 }
 
-// Safety: cpal::Stream is not Send on all platforms in older versions; we only
-// use it from the thread that constructed it. Tauri's state is `Send + Sync`
-// so we wrap the whole engine in `Mutex` from the caller side.
+// safety. `cpal::Stream` is not `Send` on all platforms in older versions.
+// we only use it from the thread that constructed it. tauri's state is
+// `Send + Sync` so we wrap the whole engine in a `Mutex` from the caller side.
 unsafe impl Send for CaptureEngine {}
 unsafe impl Sync for CaptureEngine {}
 
@@ -168,7 +172,7 @@ impl CaptureEngine {
         stream.play()?;
 
         Ok(Self {
-            _stream: stream,
+            stream,
             ring,
             recording_buf,
             recording,
@@ -178,9 +182,15 @@ impl CaptureEngine {
         })
     }
 
-    pub fn start_recording(&self) {
+    /// begin appending live samples to the recording buffer, prepending the
+    /// last `preroll_ms` of warm ring buffer audio (clamped to `RING_SECONDS`).
+    ///
+    /// mirrors hex's `SuperFastCaptureController.startRecording`. the prepend
+    /// is what stops the first syllable being clipped.
+    pub fn start_recording(&self, preroll_ms: u32) {
+        let preroll_sec = (preroll_ms as f32 / 1000.0).min(RING_SECONDS);
         let preroll_samples =
-            (self.source_rate as f32 * PREROLL_SECONDS * self.source_channels as f32) as usize;
+            (self.source_rate as f32 * preroll_sec * self.source_channels as f32) as usize;
         let tail = self.ring.lock().tail(preroll_samples);
         {
             let mut buf = self.recording_buf.lock();
@@ -190,7 +200,7 @@ impl CaptureEngine {
         self.recording.store(true, Ordering::Release);
     }
 
-    /// Stop recording. Returns (samples_16k_mono, duration_sec).
+    /// stop recording. returns `(samples_16k_mono, duration_sec)`.
     pub fn stop_recording(&self) -> (Vec<f32>, f64) {
         self.recording.store(false, Ordering::Release);
         let raw = {
@@ -263,7 +273,7 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     out
 }
 
-/// Write 16 kHz mono f32 samples as a 16-bit PCM WAV file.
+/// write 16 kHz mono f32 samples as a 16 bit pcm wav file.
 #[allow(dead_code)]
 pub fn write_wav(path: &std::path::Path, samples: &[f32]) -> Result<()> {
     let spec = hound::WavSpec {

@@ -2,13 +2,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* geist sans. single variable face. no mono companion.
+ * timers and shortcuts render in regular geist with `tabular-nums`. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Geist-Variable.woff2") format("woff2-variations");
+}
+
 @theme inline {
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    monospace;
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-sans);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -29,8 +37,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -43,95 +49,103 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* type scale. desktop utility, smaller than web defaults.
+   * 11, 13, 15, 18 px. */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
 }
 
-/* Light mode — warm cream canvas, white cards, tan sidebar */
+/* light. shadcn neutral. white canvas, warm cream sidebar
+ * (the one explicit override of the no warm tints rule, kept
+ * because the rail must read as a separate plane). */
 :root {
-  --radius: 10px;
+  --radius: 0.5rem;
 
-  --background: hsl(40 30% 98.5%);
-  --foreground: hsl(24 10% 10%);
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(240 10% 3.9%);
 
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(24 10% 10%);
+  --card-foreground: hsl(240 10% 3.9%);
 
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(24 10% 10%);
+  --popover-foreground: hsl(240 10% 3.9%);
 
-  --primary: hsl(24 10% 10%);
-  --primary-foreground: hsl(40 30% 98.5%);
+  --primary: hsl(240 5.9% 10%);
+  --primary-foreground: hsl(0 0% 98%);
 
-  --secondary: hsl(35 15% 94%);
-  --secondary-foreground: hsl(24 10% 10%);
+  --secondary: hsl(240 4.8% 95.9%);
+  --secondary-foreground: hsl(240 5.9% 10%);
 
-  --muted: hsl(35 15% 94%);
-  --muted-foreground: hsl(25 5% 45%);
+  --muted: hsl(240 4.8% 95.9%);
+  --muted-foreground: hsl(240 3.8% 46.1%);
 
-  --accent: hsl(35 15% 94%);
-  --accent-foreground: hsl(24 10% 10%);
+  --accent: hsl(240 4.8% 95.9%);
+  --accent-foreground: hsl(240 5.9% 10%);
 
-  --destructive: hsl(0 72% 45%);
-  --destructive-foreground: hsl(40 30% 98.5%);
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 98%);
 
-  --border: hsl(30 15% 89%);
-  --input: hsl(30 15% 89%);
-  --ring: hsl(160 70% 36%);
+  --border: hsl(240 5.9% 90%);
+  --input: hsl(240 5.9% 90%);
+  --ring: hsl(240 5.9% 10%);
 
-  --brand: hsl(160 70% 36%);
-  --brand-foreground: hsl(0 0% 100%);
-
-  --sidebar: hsl(35 22% 95%);
-  --sidebar-foreground: hsl(24 10% 15%);
-  --sidebar-border: hsl(30 15% 86%);
-  --sidebar-accent: hsl(35 18% 90%);
-  --sidebar-accent-foreground: hsl(24 10% 10%);
-  --sidebar-ring: hsl(160 70% 36%);
+  --sidebar: hsl(48 33% 97%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-border: hsl(40 15% 90%);
+  --sidebar-accent: hsl(45 25% 92%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-ring: hsl(240 5.9% 10%);
 }
 
-/* Dark mode — shadcn zinc defaults, sidebar lifts ~1.5% from canvas */
+/* dark. content area is a slightly lifted near black, sidebar and
+ * titlebar are pushed darker so the rail reads as the deeper plane
+ * (linear, discord, vs code convention). */
 .dark {
-  --background: hsl(0 0% 3.9%);
+  --background: hsl(240 6% 9%);
   --foreground: hsl(0 0% 98%);
 
-  --card: hsl(0 0% 6%);
+  --card: hsl(240 6% 9%);
   --card-foreground: hsl(0 0% 98%);
 
-  --popover: hsl(0 0% 6%);
+  --popover: hsl(240 6% 9%);
   --popover-foreground: hsl(0 0% 98%);
 
   --primary: hsl(0 0% 98%);
-  --primary-foreground: hsl(0 0% 9%);
+  --primary-foreground: hsl(240 5.9% 10%);
 
-  --secondary: hsl(0 0% 14.9%);
+  --secondary: hsl(240 4% 15%);
   --secondary-foreground: hsl(0 0% 98%);
 
-  --muted: hsl(0 0% 14.9%);
-  --muted-foreground: hsl(0 0% 63.9%);
+  --muted: hsl(240 4% 15%);
+  --muted-foreground: hsl(240 5% 64.9%);
 
-  --accent: hsl(0 0% 14.9%);
+  --accent: hsl(240 4% 15%);
   --accent-foreground: hsl(0 0% 98%);
 
-  --destructive: hsl(0 72% 51%);
+  --destructive: hsl(0 62.8% 30.6%);
   --destructive-foreground: hsl(0 0% 98%);
 
-  --border: hsl(0 0% 14.9%);
-  --input: hsl(0 0% 14.9%);
-  --ring: hsl(160 84% 39%);
+  --border: hsl(240 4% 18%);
+  --input: hsl(240 4% 18%);
+  --ring: hsl(240 4.9% 83.9%);
 
-  --brand: hsl(160 84% 39%);
-  --brand-foreground: hsl(0 0% 5%);
-
-  --sidebar: hsl(0 0% 5.5%);
-  --sidebar-foreground: hsl(0 0% 85%);
-  --sidebar-border: hsl(0 0% 10%);
-  --sidebar-accent: hsl(0 0% 10%);
+  --sidebar: hsl(240 8% 4%);
+  --sidebar-foreground: hsl(240 5% 88%);
+  --sidebar-border: hsl(240 6% 9%);
+  --sidebar-accent: hsl(240 6% 11%);
   --sidebar-accent-foreground: hsl(0 0% 98%);
-  --sidebar-ring: hsl(160 84% 39%);
+  --sidebar-ring: hsl(240 4.9% 83.9%);
 }
 
 @layer base {
   * {
     border-color: var(--border);
+    /* disable overscroll bounce so the webview2 surface never reveals
+     * the layer behind the window when the user scrolls past content. */
+    overscroll-behavior: none;
   }
   html,
   body,
@@ -148,7 +162,47 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  ::selection {
-    background-color: color-mix(in srgb, var(--brand) 25%, transparent);
+
+  /* hide the os scrollbars across all scrollable surfaces. scrolling still
+   * works. the chrome just isn't visible. match the design's clean
+   * borderless aesthetic. */
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    background: transparent;
   }
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}
+
+/* the indicator window is a separate tauri webview at `#/indicator`.
+ * tauri marks it transparent but the global body background paints over
+ * the top. this class (added by `IndicatorWindow` on mount) makes the
+ * html, body, and root chain truly transparent so only the pill is visible. */
+body.indicator-window,
+body.indicator-window html,
+body.indicator-window #root {
+  background: transparent !important;
+}
+
+/* tabular numerals for any column of numbers (timers, sizes, durations). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* keyboard shortcut chip. */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }

@@ -1,11 +1,12 @@
-//! Speech-to-text backend.
+//! speech to text backend.
 //!
-//! On Windows (default): uses `sherpa-rs` to run Parakeet-TDT v3 (English)
-//! via ONNX Runtime with the DirectML execution provider — works on any GPU
-//! vendor and falls back to CPU if none is available.
+//! on windows (default): uses `sherpa-rs` to run parakeet tdt v3 (english)
+//! via onnx runtime with the directml execution provider. works on any gpu
+//! vendor and falls back to cpu if none is available.
 //!
-//! On non-Windows hosts or when `mock-transcribe` is set: a stub implementation
-//! so the crate still compiles and the frontend can be smoke-tested.
+//! on non windows hosts or when `mock-transcribe` is set: a stub
+//! implementation so the crate still compiles and the frontend can be
+//! smoke tested.
 
 use anyhow::Result;
 use std::path::PathBuf;
@@ -30,21 +31,18 @@ pub fn load(model_dir: PathBuf) -> Result<Box<dyn Transcriber>> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Real backend (Windows + sherpa-onnx)
-// ---------------------------------------------------------------------------
+// real backend (windows + sherpa-onnx)
 
 #[cfg(all(windows, not(feature = "mock-transcribe")))]
 mod real {
     use super::*;
-    use anyhow::{Context, Result};
+    use anyhow::Result;
     use parking_lot::Mutex;
-    use sherpa_rs::nemo_parakeet::NemoParakeetConfig;
-    use sherpa_rs::offline_recognizer::{OfflineRecognizer, OfflineRecognizerConfig};
+    use sherpa_rs::transducer::{TransducerConfig, TransducerRecognizer};
     use std::path::PathBuf;
 
     pub struct ParakeetTranscriber {
-        inner: Mutex<OfflineRecognizer>,
+        inner: Mutex<TransducerRecognizer>,
     }
 
     impl ParakeetTranscriber {
@@ -60,20 +58,19 @@ mod real {
                 }
             }
 
-            let config = OfflineRecognizerConfig {
-                nemo_parakeet: Some(NemoParakeetConfig {
-                    encoder: encoder.to_string_lossy().to_string(),
-                    decoder: decoder.to_string_lossy().to_string(),
-                    joiner: joiner.to_string_lossy().to_string(),
-                    tokens: tokens.to_string_lossy().to_string(),
-                    ..Default::default()
-                }),
+            let config = TransducerConfig {
+                encoder: encoder.to_string_lossy().to_string(),
+                decoder: decoder.to_string_lossy().to_string(),
+                joiner: joiner.to_string_lossy().to_string(),
+                tokens: tokens.to_string_lossy().to_string(),
                 sample_rate: 16_000,
                 feature_dim: 80,
+                model_type: "nemo_transducer".to_string(),
                 ..Default::default()
             };
 
-            let recognizer = OfflineRecognizer::new(&config).context("init sherpa-onnx")?;
+            let recognizer = TransducerRecognizer::new(config)
+                .map_err(|e| anyhow::anyhow!("init sherpa-onnx: {e}"))?;
             Ok(Self {
                 inner: Mutex::new(recognizer),
             })
@@ -83,7 +80,7 @@ mod real {
     impl Transcriber for ParakeetTranscriber {
         fn transcribe(&self, samples: &[f32]) -> Result<String> {
             let mut rec = self.inner.lock();
-            let text = rec.transcribe(16_000, samples)?;
+            let text = rec.transcribe(16_000, samples);
             Ok(text.trim().to_string())
         }
     }
@@ -92,9 +89,7 @@ mod real {
 #[cfg(all(windows, not(feature = "mock-transcribe")))]
 pub use real::ParakeetTranscriber;
 
-// ---------------------------------------------------------------------------
-// Mock backend (non-Windows or explicit feature flag)
-// ---------------------------------------------------------------------------
+// mock backend (non windows or explicit feature flag)
 
 pub struct MockTranscriber;
 

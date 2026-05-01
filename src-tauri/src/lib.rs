@@ -8,11 +8,13 @@ mod paths;
 mod pipeline;
 mod settings;
 mod state;
+mod target_app;
 mod transcribe;
 mod tray;
 
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
+use tauri_plugin_autostart::ManagerExt;
 use tracing_subscriber::EnvFilter;
 
 use crate::history::HistoryStore;
@@ -47,40 +49,59 @@ pub fn run() {
             let settings = settings.clone();
             let pipeline = pipeline.clone();
             move |app| {
-                // 1. Build the tray icon.
+                // 1. build the tray icon.
                 if let Err(e) = tray::build(app.handle()) {
                     tracing::error!(?e, "failed to build tray");
                 }
 
-                // 2. Hide main window if user prefers start-minimized.
+                // 2. hide main window if user prefers start minimized.
                 if settings.get().start_minimized {
                     if let Some(win) = app.get_webview_window("main") {
                         let _ = win.hide();
                     }
                 }
 
-                // 3. Ensure indicator window is hidden at launch.
+                // 3. indicator window. hidden at launch and click through set
+                //    once (bug fix. was previously reapplied on every press).
                 if let Some(win) = app.get_webview_window("indicator") {
                     let _ = win.hide();
+                    let _ = win.set_ignore_cursor_events(true);
                 }
 
-                // 4. Kick off the global hotkey listener.
+                // 4. sync the os autostart entry with our persisted setting.
+                //    the plugin doesn't auto sync. if a user toggled the
+                //    setting in a previous run we have to reconcile here.
+                let manager = app.autolaunch();
+                let want = settings.get().launch_at_login;
+                let have = manager.is_enabled().unwrap_or(false);
+                if want != have {
+                    let result = if want {
+                        manager.enable()
+                    } else {
+                        manager.disable()
+                    };
+                    if let Err(e) = result {
+                        tracing::warn!(?e, "autostart sync failed");
+                    }
+                }
+
+                // 5. kick off the global hotkey listener.
                 let app_handle = app.handle().clone();
                 let pipeline_for_hotkey = pipeline.clone();
-                let _listener = HotkeyListener::spawn(settings.get().hotkey, move |evt| {
+                let listener = HotkeyListener::spawn(settings.get().hotkey, move |evt| {
                     let app = app_handle.clone();
                     let pipeline = pipeline_for_hotkey.clone();
-                    // Offload to an async runtime so the hotkey callback
-                    // returns quickly; rdev is very sensitive to blocking.
+                    // offload to an async runtime so the hotkey callback
+                    // returns quickly. rdev is very sensitive to blocking.
                     tauri::async_runtime::spawn_blocking(move || match evt {
                         HotkeyEvent::Pressed => pipeline.on_hotkey_press(&app),
                         HotkeyEvent::Released => pipeline.on_hotkey_release(&app),
                     });
                 });
-                app.manage(_listener);
+                app.manage(listener);
 
-                // 5. Load the transcriber in the background — may download
-                // the model on first run, which takes time.
+                // 6. load the transcriber in the background. may download
+                //    the model on first run, which takes time.
                 let app_handle = app.handle().clone();
                 let pipeline_for_load = pipeline.clone();
                 tauri::async_runtime::spawn(async move {
@@ -124,8 +145,8 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
-            // Closing the main window should just hide it to the tray, not
-            // quit the app. The user quits via tray menu.
+            // closing the main window should just hide it to the tray, not
+            // quit the app. the user quits via tray menu.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     api.prevent_close();
@@ -149,6 +170,7 @@ pub fn run() {
             commands::show_main_window,
             commands::redownload_model,
             commands::model_status,
+            commands::get_insights,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

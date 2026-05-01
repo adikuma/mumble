@@ -5,6 +5,13 @@ use std::sync::Arc;
 
 use crate::paths;
 
+/// user facing settings persisted to `%APPDATA%\Mumble\settings.json`.
+///
+/// the default hotkey is `RightAlt` (every laptop has it. no right ctrl on
+/// 14 inch keyboards). pre roll defaults to 450 ms (hex's value, the one
+/// reason it never clips first syllables. see `SuperFastCaptureController`
+/// in the cloned hex source). auto paste defaults to ON. the only way to
+/// flip it is from the in app settings, behavior toggle.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -14,17 +21,37 @@ pub struct Settings {
     pub start_minimized: bool,
     pub theme: String,
     pub paused: bool,
+
+    /// milliseconds of audio prepended on hotkey press (the warm ring buffer
+    /// look back window). 0 disables pre roll. hex uses 450.
+    #[serde(default = "default_preroll_ms")]
+    pub pre_roll_ms: u32,
+
+    /// when true, transcription pastes at the cursor via simulated `Ctrl+V`
+    /// and restores the prior clipboard. when false, the transcript is left
+    /// in the clipboard and the user pastes manually.
+    #[serde(default = "default_auto_paste")]
+    pub auto_paste: bool,
+}
+
+fn default_preroll_ms() -> u32 {
+    450
+}
+fn default_auto_paste() -> bool {
+    true
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            hotkey: "RightCtrl".into(),
+            hotkey: "RightAlt".into(),
             input_device: None,
             launch_at_login: false,
             start_minimized: false,
             theme: "system".into(),
             paused: false,
+            pre_roll_ms: default_preroll_ms(),
+            auto_paste: default_auto_paste(),
         }
     }
 }

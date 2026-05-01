@@ -1,12 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export type AppState =
-  | "idle"
-  | "recording"
-  | "transcribing"
-  | "pasting"
-  | "paused";
+export type AppState = "idle" | "recording" | "transcribing" | "pasting";
 
 export interface Settings {
   hotkey: string;
@@ -15,6 +10,8 @@ export interface Settings {
   startMinimized: boolean;
   theme: string;
   paused: boolean;
+  preRollMs: number;
+  autoPaste: boolean;
 }
 
 export interface Transcript {
@@ -24,6 +21,8 @@ export interface Transcript {
   text: string;
   inputDevice: string | null;
   model: string;
+  latencyMs?: number | null;
+  targetApp?: string | null;
 }
 
 export interface DeviceInfo {
@@ -44,6 +43,26 @@ export interface DownloadProgress {
   done: boolean;
 }
 
+export interface DailyBucket {
+  day: string;
+  count: number;
+}
+
+export interface TopEntry {
+  label: string;
+  count: number;
+}
+
+export interface InsightsData {
+  words: number;
+  sessions: number;
+  avgLatencyMs: number | null;
+  timeSavedSec: number;
+  dailyActivity: DailyBucket[];
+  topApps: TopEntry[];
+  topWords: TopEntry[];
+}
+
 export const isTauri = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -59,29 +78,19 @@ async function safeInvoke<T>(
   return invoke<T>(cmd, args);
 }
 
-// --- Settings -------------------------------------------------------------
-
 export const getSettings = (): Promise<Settings> => safeInvoke("get_settings");
 
 export const updateSettings = (patch: Partial<Settings>): Promise<Settings> =>
   safeInvoke("update_settings", { patch });
 
-// --- Audio devices --------------------------------------------------------
-
 export const listInputDevices = (): Promise<DeviceInfo[]> =>
   safeInvoke("list_input_devices");
-
-// --- Hotkey capture -------------------------------------------------------
 
 export const captureHotkey = (): Promise<string> =>
   safeInvoke("capture_hotkey");
 
-// --- Pipeline state -------------------------------------------------------
-
 export const getState = (): Promise<AppState> => safeInvoke("get_state");
 export const getMeter = (): Promise<number> => safeInvoke("get_meter");
-
-// --- History --------------------------------------------------------------
 
 export const listHistory = (
   query?: string,
@@ -99,21 +108,18 @@ export const copyTranscript = (id: string): Promise<void> =>
 export const repasteTranscript = (id: string): Promise<void> =>
   safeInvoke("repaste_transcript", { id });
 
-// --- Window controls ------------------------------------------------------
-
 export const hideMainWindow = (): Promise<void> =>
   safeInvoke("hide_main_window");
 export const showMainWindow = (): Promise<void> =>
   safeInvoke("show_main_window");
-
-// --- Model ----------------------------------------------------------------
 
 export const modelStatus = (): Promise<ModelStatus> =>
   safeInvoke("model_status");
 export const redownloadModel = (): Promise<void> =>
   safeInvoke("redownload_model");
 
-// --- Events ---------------------------------------------------------------
+export const getInsights = (rangeDays = 7): Promise<InsightsData> =>
+  safeInvoke("get_insights", { rangeDays });
 
 export interface StateChangedEvent {
   state: AppState;
