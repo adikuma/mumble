@@ -58,41 +58,41 @@
   --text-lg: 18px;
 }
 
-/* light. shadcn neutral. white canvas, warm cream sidebar
- * (the one explicit override of the no warm tints rule, kept
- * because the rail must read as a separate plane). */
+/* light mode. tinted warm canvas so white cards float above the background.
+ * sidebar stays warm cream as the distinct plane. indigo primary for focus. */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(240 10% 3.9%);
+  --background: 40 14% 95.5%;
+  --foreground: 0 0% 9%;
 
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(240 10% 3.9%);
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
 
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(240 10% 3.9%);
 
-  --primary: hsl(240 5.9% 10%);
-  --primary-foreground: hsl(0 0% 98%);
+  --primary: 248 53% 58%;
+  --primary-foreground: 0 0% 100%;
 
   --secondary: hsl(240 4.8% 95.9%);
   --secondary-foreground: hsl(240 5.9% 10%);
 
-  --muted: hsl(240 4.8% 95.9%);
-  --muted-foreground: hsl(240 3.8% 46.1%);
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 45%;
 
-  --accent: hsl(240 4.8% 95.9%);
-  --accent-foreground: hsl(240 5.9% 10%);
+  --accent: 48 25% 94%;
+  --accent-foreground: 0 0% 12%;
 
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: hsl(0 0% 98%);
 
-  --border: hsl(240 5.9% 90%);
+  --border: 0 0% 91%;
+  --border-strong: 0 0% 85%;
   --input: hsl(240 5.9% 90%);
   --ring: hsl(240 5.9% 10%);
 
-  --sidebar: hsl(48 33% 97%);
+  --sidebar: 48 33% 97%;
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-border: hsl(40 15% 90%);
   --sidebar-accent: hsl(45 25% 92%);
@@ -100,39 +100,39 @@
   --sidebar-ring: hsl(240 5.9% 10%);
 }
 
-/* dark. content area is a slightly lifted near black, sidebar and
- * titlebar are pushed darker so the rail reads as the deeper plane
- * (linear, discord, vs code convention). */
+/* dark mode. lifted near black content area, sidebar pushed darker as
+ * the deeper plane (linear, discord, vs code convention). */
 .dark {
-  --background: hsl(240 6% 9%);
-  --foreground: hsl(0 0% 98%);
+  --background: 240 6% 10%;
+  --foreground: 0 0% 95%;
 
-  --card: hsl(240 6% 9%);
-  --card-foreground: hsl(0 0% 98%);
+  --card: 240 5% 14.5%;
+  --card-foreground: 0 0% 95%;
 
   --popover: hsl(240 6% 9%);
   --popover-foreground: hsl(0 0% 98%);
 
-  --primary: hsl(0 0% 98%);
-  --primary-foreground: hsl(240 5.9% 10%);
+  --primary: 248 70% 72%;
+  --primary-foreground: 240 6% 10%;
 
   --secondary: hsl(240 4% 15%);
   --secondary-foreground: hsl(0 0% 98%);
 
-  --muted: hsl(240 4% 15%);
-  --muted-foreground: hsl(240 5% 64.9%);
+  --muted: 240 5% 18%;
+  --muted-foreground: 240 5% 60%;
 
-  --accent: hsl(240 4% 15%);
-  --accent-foreground: hsl(0 0% 98%);
+  --accent: 240 5% 19%;
+  --accent-foreground: 0 0% 96%;
 
   --destructive: hsl(0 62.8% 30.6%);
   --destructive-foreground: hsl(0 0% 98%);
 
-  --border: hsl(240 4% 18%);
+  --border: 240 4% 19%;
+  --border-strong: 240 4% 24%;
   --input: hsl(240 4% 18%);
   --ring: hsl(240 4.9% 83.9%);
 
-  --sidebar: hsl(240 8% 4%);
+  --sidebar: 240 6% 9%;
   --sidebar-foreground: hsl(240 5% 88%);
   --sidebar-border: hsl(240 6% 9%);
   --sidebar-accent: hsl(240 6% 11%);
@@ -205,4 +205,29 @@ body.indicator-window #root {
   font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+@layer utilities {
+  .shadow-lift {
+    box-shadow:
+      0 1px 2px hsl(40 10% 45% / 0.07),
+      0 3px 8px hsl(40 10% 40% / 0.06),
+      0 8px 22px hsl(40 10% 40% / 0.05);
+  }
+  .dark .shadow-lift {
+    box-shadow:
+      0 2px 6px hsl(0 0% 0% / 0.32),
+      0 8px 22px hsl(0 0% 0% / 0.28);
+  }
+  .shadow-lift-hover {
+    box-shadow:
+      0 3px 8px hsl(40 10% 40% / 0.1),
+      0 10px 24px hsl(40 10% 40% / 0.12),
+      0 20px 40px hsl(40 10% 40% / 0.08);
+  }
+  .dark .shadow-lift-hover {
+    box-shadow:
+      0 4px 12px hsl(0 0% 0% / 0.4),
+      0 16px 36px hsl(0 0% 0% / 0.4);
+  }
 }
