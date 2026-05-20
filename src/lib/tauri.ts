@@ -121,6 +121,11 @@ export const redownloadModel = (): Promise<void> =>
 export const getInsights = (rangeDays = 7): Promise<InsightsData> =>
   safeInvoke("get_insights", { rangeDays });
 
+export const getAppIcon = async (exePath: string): Promise<string | null> => {
+  const result = await safeInvoke<string | null>("get_app_icon", { exePath });
+  return result ?? null;
+};
+
 export interface StateChangedEvent {
   state: AppState;
 }
@@ -129,6 +134,11 @@ export interface TranscribedEvent {
 }
 export interface ErrorEvent {
   message: string;
+}
+
+export interface ChunkProgressEvent {
+  current: number;
+  total: number;
 }
 
 export const onStateChanged = (
@@ -166,5 +176,12 @@ export const onSettingsChanged = (
   handler: (payload: Partial<Settings>) => void,
 ): Promise<UnlistenFn> =>
   listen<Partial<Settings>>("mumble://settings-changed", (evt) =>
+    handler(evt.payload),
+  );
+
+export const onChunkProgress = (
+  handler: (e: ChunkProgressEvent) => void,
+): Promise<UnlistenFn> =>
+  listen<ChunkProgressEvent>("mumble://chunk-progress", (evt) =>
     handler(evt.payload),
   );

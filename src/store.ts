@@ -29,6 +29,9 @@ interface MumbleStore {
   setSelectedId: (id: string | null) => void;
   setHistoryLoading: (loading: boolean) => void;
   setDownload: (d: MumbleStore["download"]) => void;
+
+  appIcons: Record<string, string | null>;
+  setAppIcon: (exePath: string, icon: string | null) => void;
 }
 
 export const useMumbleStore = create<MumbleStore>((set) => ({
@@ -71,4 +74,8 @@ export const useMumbleStore = create<MumbleStore>((set) => ({
   setSelectedId: (selectedId) => set({ selectedId }),
   setHistoryLoading: (historyLoading) => set({ historyLoading }),
   setDownload: (download) => set({ download }),
+
+  appIcons: {},
+  setAppIcon: (exePath, icon) =>
+    set((s) => ({ appIcons: { ...s.appIcons, [exePath]: icon } })),
 }));
