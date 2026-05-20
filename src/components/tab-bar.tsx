@@ -33,6 +33,7 @@ export function TabBar({ view, onChange, historyCount }: TabBarProps) {
         <button
           onClick={() => onChange("settings")}
           aria-label="Settings"
+          aria-pressed={view === "settings"}
           className={cn(
             "flex h-[30px] w-[30px] items-center justify-center rounded-[7px] border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-muted-foreground transition-colors hover:bg-[hsl(var(--accent))] hover:text-foreground",
             view === "settings" && "bg-[hsl(var(--accent))] text-foreground",
@@ -57,6 +58,7 @@ function SegTab({
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
         "flex items-center gap-2 rounded-[7px] px-[15px] py-[6px] text-[13.5px] font-medium transition-colors",
         active
