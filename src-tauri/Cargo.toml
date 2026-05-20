@@ -53,6 +53,10 @@ futures-util = "0.3"
 # --- Time ---
 chrono = { version = "0.4", features = ["serde"] }
 
+# --- Encoding ---
+base64 = "0.22"
+miniz_oxide = "0.8"
+
 # --- Audio capture (cross-platform; uses WASAPI on Windows) ---
 cpal = "0.15"
 hound = "3.5"  # WAV writer
@@ -72,6 +76,9 @@ windows = { version = "0.58", features = [
     "Win32_System_Registry",
     "Win32_System_Threading",
     "Win32_Media_Audio",
+    "Win32_UI_Shell",
+    "Win32_Graphics_Gdi",
+    "Win32_Storage_FileSystem",
 ] }
 
 [features]

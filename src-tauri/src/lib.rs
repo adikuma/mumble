@@ -1,3 +1,4 @@
+pub mod app_icons;
 mod audio;
 mod commands;
 mod history;

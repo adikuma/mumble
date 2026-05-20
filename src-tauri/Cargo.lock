@@ -2828,6 +2828,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arboard",
+ "base64 0.22.1",
  "chrono",
  "cpal",
  "crossbeam-channel",
@@ -2836,6 +2837,7 @@ dependencies = [
  "enigo",
  "futures-util",
  "hound",
+ "miniz_oxide",
  "parking_lot",
  "rdev",
  "reqwest 0.12.28",

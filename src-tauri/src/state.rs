@@ -32,12 +32,14 @@ impl AppState {
 /// lock free state holder. hotkey thread reads, worker writes.
 pub struct SharedState {
     inner: AtomicU8,
+    pub icon_cache: crate::app_icons::IconCache,
 }
 
 impl SharedState {
     pub fn new() -> Self {
         Self {
             inner: AtomicU8::new(AppState::Idle as u8),
+            icon_cache: crate::app_icons::IconCache::new(),
         }
     }
 
