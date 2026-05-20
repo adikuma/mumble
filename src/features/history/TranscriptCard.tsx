@@ -8,6 +8,7 @@ import {
   deleteTranscript,
   type Transcript,
 } from "@/lib/tauri";
+import { AppIcon } from "@/features/history/AppIcon";
 
 interface Props {
   transcript: Transcript;
@@ -74,7 +75,8 @@ export function TranscriptCard({ transcript, onChanged }: Props) {
             {formatDuration(transcript.durationSec)}
           </span>
           {transcript.targetApp && (
-            <span className="text-muted-foreground ml-auto text-[11px]">
+            <span className="text-muted-foreground ml-auto flex items-center gap-1.5 text-[11px]">
+              <AppIcon appName={transcript.targetApp} />
               {transcript.targetApp}
             </span>
           )}
