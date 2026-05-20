@@ -48,88 +48,92 @@ export function InsightsView() {
     : 1;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-8 py-7">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em]">
-          {empty
-            ? emDash()
-            : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week`}
-        </h1>
-        <p className="text-muted-foreground text-xs">
-          {empty
-            ? emDash()
-            : `Across ${data!.sessions} ${data!.sessions === 1 ? "transcript" : "transcripts"}.`}
-        </p>
-      </div>
+    <div className="flex flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+      <div className="mx-auto w-full max-w-[880px] px-7 pt-6 pb-16">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-[22px] font-semibold tracking-[-0.015em]">
+              {empty
+                ? emDash()
+                : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week`}
+            </h1>
+            <p className="text-muted-foreground text-xs">
+              {empty
+                ? emDash()
+                : `Across ${data!.sessions} ${data!.sessions === 1 ? "transcript" : "transcripts"}.`}
+            </p>
+          </div>
 
-      <div className="grid grid-cols-4 gap-3">
-        <Stat
-          label="Words"
-          value={empty ? emDash() : data!.words.toLocaleString()}
-        />
-        <Stat
-          label="Sessions"
-          value={empty ? emDash() : data!.sessions.toLocaleString()}
-        />
-        <Stat
-          label="Avg latency"
-          value={
-            empty || data!.avgLatencyMs === null
-              ? emDash()
-              : `${data!.avgLatencyMs}`
-          }
-          unit={!empty && data!.avgLatencyMs !== null ? "ms" : undefined}
-        />
-        <Stat
-          label="Time saved"
-          value={empty ? emDash() : formatHoursMinutes(data!.timeSavedSec)}
-          unit={!empty ? "hr" : undefined}
-        />
-      </div>
+          <div className="grid grid-cols-4 gap-3">
+            <Stat
+              label="Words"
+              value={empty ? emDash() : data!.words.toLocaleString()}
+            />
+            <Stat
+              label="Sessions"
+              value={empty ? emDash() : data!.sessions.toLocaleString()}
+            />
+            <Stat
+              label="Avg latency"
+              value={
+                empty || data!.avgLatencyMs === null
+                  ? emDash()
+                  : `${data!.avgLatencyMs}`
+              }
+              unit={!empty && data!.avgLatencyMs !== null ? "ms" : undefined}
+            />
+            <Stat
+              label="Time saved"
+              value={empty ? emDash() : formatHoursMinutes(data!.timeSavedSec)}
+              unit={!empty ? "hr" : undefined}
+            />
+          </div>
 
-      <div className="bg-card border-border flex flex-col gap-3.5 rounded-lg border p-[18px]">
-        <div className="text-sm font-semibold">Daily activity</div>
-        <div className="flex h-[100px] items-end gap-1.5">
-          {data?.dailyActivity.map((d, i) => {
-            const isLast = i === data.dailyActivity.length - 1;
-            const height = empty ? 0 : (d.count / dailyMax) * 100;
-            return (
-              <div
-                key={d.day}
-                className="bg-foreground flex-1 rounded-sm rounded-b-none"
-                style={{
-                  height: `${height}%`,
-                  minHeight: empty ? 0 : 2,
-                  opacity: isLast ? 1 : 0.55,
-                }}
-              />
-            );
-          })}
+          <div className="bg-card border-border flex flex-col gap-3.5 rounded-lg border p-[18px]">
+            <div className="text-sm font-semibold">Daily activity</div>
+            <div className="flex h-[100px] items-end gap-1.5">
+              {data?.dailyActivity.map((d, i) => {
+                const isLast = i === data.dailyActivity.length - 1;
+                const height = empty ? 0 : (d.count / dailyMax) * 100;
+                return (
+                  <div
+                    key={d.day}
+                    className="bg-foreground flex-1 rounded-sm rounded-b-none"
+                    style={{
+                      height: `${height}%`,
+                      minHeight: empty ? 0 : 2,
+                      opacity: isLast ? 1 : 0.55,
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div className="text-muted-foreground flex gap-1.5 text-[10px]">
+              {(data?.dailyActivity ?? Array.from({ length: 7 })).map(
+                (_, i, arr) => {
+                  const day = data?.dailyActivity[i];
+                  const isLast = i === arr.length - 1;
+                  return (
+                    <span
+                      key={day?.day ?? i}
+                      className="flex-1 text-center tabular-nums"
+                    >
+                      {day ? dayLabelFromIso(day.day, isLast) : ""}
+                    </span>
+                  );
+                },
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-[1.4fr_1fr] gap-3">
+            <ListCard
+              title="Where you pasted"
+              entries={empty ? [] : data!.topApps}
+            />
+            <ListCard title="Top words" entries={empty ? [] : data!.topWords} />
+          </div>
         </div>
-        <div className="text-muted-foreground flex gap-1.5 text-[10px]">
-          {(data?.dailyActivity ?? Array.from({ length: 7 })).map(
-            (_, i, arr) => {
-              const day = data?.dailyActivity[i];
-              const isLast = i === arr.length - 1;
-              return (
-                <span
-                  key={day?.day ?? i}
-                  className="flex-1 text-center tabular-nums"
-                >
-                  {day ? dayLabelFromIso(day.day, isLast) : ""}
-                </span>
-              );
-            },
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[1.4fr_1fr] gap-3">
-        <ListCard
-          title="Where you pasted"
-          entries={empty ? [] : data!.topApps}
-        />
-        <ListCard title="Top words" entries={empty ? [] : data!.topWords} />
       </div>
     </div>
   );
