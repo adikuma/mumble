@@ -172,6 +172,7 @@ pub fn run() {
             commands::redownload_model,
             commands::model_status,
             commands::get_insights,
+            commands::get_app_icon,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

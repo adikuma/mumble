@@ -203,6 +203,14 @@ pub fn get_insights(
     history.insights(range_days.unwrap_or(7)).map_err(err)
 }
 
+#[tauri::command]
+pub fn get_app_icon(
+    pipeline: State<'_, Arc<Pipeline>>,
+    exe_path: String,
+) -> Option<String> {
+    pipeline.state.icon_cache.get_or_extract(&exe_path)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
