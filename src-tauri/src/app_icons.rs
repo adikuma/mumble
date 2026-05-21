@@ -3,8 +3,8 @@
 // on non-windows builds the cache always returns None (stub).
 
 use base64::Engine as _;
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::Mutex;
 
 pub struct IconCache {
     inner: Mutex<HashMap<String, Option<String>>>,
@@ -12,21 +12,29 @@ pub struct IconCache {
 
 impl IconCache {
     pub fn new() -> Self {
-        Self { inner: Mutex::new(HashMap::new()) }
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
     }
 
     // returns Some data url on first successful extraction or a cache hit.
     // returns None when extraction has failed before or fails now.
     // never panics.
     pub fn get_or_extract(&self, exe_path: &str) -> Option<String> {
-        if let Some(hit) = self.inner.lock().ok().and_then(|g| g.get(exe_path).cloned()) {
+        if let Some(hit) = self.inner.lock().get(exe_path).cloned() {
             return hit;
         }
         let extracted = extract_icon(exe_path);
-        if let Ok(mut g) = self.inner.lock() {
-            g.insert(exe_path.to_string(), extracted.clone());
-        }
+        self.inner
+            .lock()
+            .insert(exe_path.to_string(), extracted.clone());
         extracted
+    }
+}
+
+impl Default for IconCache {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
