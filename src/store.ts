@@ -57,10 +57,15 @@ export const useMumbleStore = create<MumbleStore>((set) => ({
           : (transcripts[0]?.id ?? null),
     })),
   addTranscript: (t) =>
-    set((s) => ({
-      transcripts: [t, ...s.transcripts],
-      selectedId: s.selectedId ?? t.id,
-    })),
+    set((s) => {
+      // ignore if a transcript with this id is already present. guards against
+      // an event firing more than once so the list never shows duplicates.
+      if (s.transcripts.some((x) => x.id === t.id)) return s;
+      return {
+        transcripts: [t, ...s.transcripts],
+        selectedId: s.selectedId ?? t.id,
+      };
+    }),
   removeTranscript: (id) =>
     set((s) => {
       const transcripts = s.transcripts.filter((t) => t.id !== id);

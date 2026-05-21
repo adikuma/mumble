@@ -50,30 +50,45 @@ export function useBackendBridge() {
         if (!cancelled) setHistoryLoading(false);
       }
 
-      const u1 = await onStateChanged((e) => setAppState(e.state));
-      const u2 = await onTranscribed((e) => addTranscript(e.transcript));
-      const u3 = await onError((e) => setError(e.message));
-      const u4 = await onReady((e) => {
-        setModelReady(e.ready);
-        setDownload(null);
-      });
-      const u5 = await onDownloadProgress((e) => {
-        setDownload(
-          e.done
-            ? null
-            : {
-                filename: e.filename,
-                downloaded: e.downloaded,
-                total: e.total,
-              },
-        );
-      });
-      const u6 = await onSettingsChanged((patch) => {
-        useMumbleStore.setState((s) =>
-          s.settings ? { settings: { ...s.settings, ...patch } } : {},
-        );
-      });
-      unlisteners.push(u1, u2, u3, u4, u5, u6);
+      // listeners register after awaits. if the effect was cleaned up during
+      // those awaits (react strict mode mounts, unmounts, then remounts in
+      // dev), the cleanup already ran against an empty list, so register only
+      // when still live and otherwise unlisten immediately. without this the
+      // first listener set leaks and every event is handled twice.
+      const guard = (u: () => void) => {
+        if (cancelled) u();
+        else unlisteners.push(u);
+      };
+
+      guard(await onStateChanged((e) => setAppState(e.state)));
+      guard(await onTranscribed((e) => addTranscript(e.transcript)));
+      guard(await onError((e) => setError(e.message)));
+      guard(
+        await onReady((e) => {
+          setModelReady(e.ready);
+          setDownload(null);
+        }),
+      );
+      guard(
+        await onDownloadProgress((e) => {
+          setDownload(
+            e.done
+              ? null
+              : {
+                  filename: e.filename,
+                  downloaded: e.downloaded,
+                  total: e.total,
+                },
+          );
+        }),
+      );
+      guard(
+        await onSettingsChanged((patch) => {
+          useMumbleStore.setState((s) =>
+            s.settings ? { settings: { ...s.settings, ...patch } } : {},
+          );
+        }),
+      );
     })();
 
     return () => {
