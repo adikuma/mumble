@@ -23,6 +23,7 @@ export interface Transcript {
   model: string;
   latencyMs?: number | null;
   targetApp?: string | null;
+  targetAppPath?: string | null;
 }
 
 export interface DeviceInfo {

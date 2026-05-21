@@ -61,37 +61,41 @@ export function TranscriptCard({ transcript, onChanged }: Props) {
     <div
       onClick={() => !editing && setOpen((o) => !o)}
       className={cn(
-        "bg-card border-border mb-2.5 cursor-pointer overflow-hidden rounded-[var(--radius)] border transition-all duration-200 ease-out",
-        "shadow-lift hover:-translate-y-[3px] hover:shadow-lift-hover",
+        "bg-card border-border mb-2.5 cursor-pointer overflow-hidden rounded-[var(--radius)] border transition-all duration-150 ease-out",
+        "shadow-lift hover:-translate-y-px hover:shadow-lift-hover",
         open && "shadow-lift-hover",
       )}
     >
-      <div className="p-3">
-        <div className="mb-1 flex items-center gap-2">
-          <span className="text-muted-foreground text-[11px]">
-            {formatRelative(transcript.createdAt)}
+      <div className="flex items-center gap-2 px-3.5 py-2.5">
+        <span className="text-muted-foreground text-[11px]">
+          {formatRelative(transcript.createdAt)}
+        </span>
+        <span className="bg-muted text-muted-foreground rounded-[5px] px-1.5 py-px text-[10.5px] tabular-nums">
+          {formatDuration(transcript.durationSec)}
+        </span>
+        {transcript.targetApp && (
+          <span className="text-muted-foreground ml-auto flex items-center gap-1.5 text-[11px]">
+            <AppIcon
+              exePath={transcript.targetAppPath}
+              appName={transcript.targetApp}
+            />
+            {transcript.targetApp}
           </span>
-          <span className="bg-muted text-muted-foreground rounded-[5px] px-1.5 py-px text-[10.5px] tabular-nums">
-            {formatDuration(transcript.durationSec)}
-          </span>
-          {transcript.targetApp && (
-            <span className="text-muted-foreground ml-auto flex items-center gap-1.5 text-[11px]">
-              <AppIcon appName={transcript.targetApp} />
-              {transcript.targetApp}
-            </span>
+        )}
+      </div>
+
+      <div className="bg-border h-px" />
+
+      <div className="flex items-center gap-2 px-3.5 py-3">
+        <p className={cn("flex-1 text-[13.5px] leading-[1.55]", !open && "line-clamp-2")}>
+          {transcript.text}
+        </p>
+        <ChevronRight
+          className={cn(
+            "text-muted-foreground size-4 shrink-0 self-center transition-transform",
+            open && "rotate-90",
           )}
-        </div>
-        <div className="flex items-start gap-2">
-          <p className={cn("text-[13.5px] leading-[1.55]", !open && "line-clamp-2")}>
-            {transcript.text}
-          </p>
-          <ChevronRight
-            className={cn(
-              "text-muted-foreground size-3.5 shrink-0 transition-transform",
-              open && "rotate-90",
-            )}
-          />
-        </div>
+        />
       </div>
 
       {open && !editing && (
