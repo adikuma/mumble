@@ -13,13 +13,13 @@ interface TabBarProps {
 
 export function TabBar({ view, onChange, historyCount }: TabBarProps) {
   return (
-    <div className="bg-background flex h-[52px] shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-3">
+    <div className="bg-background flex h-[46px] shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-3">
       <div className="flex items-center gap-3">
         <Logo size={22} className="ml-1" />
-        <div className="bg-[hsl(var(--muted))] flex gap-0.5 rounded-[10px] p-[3px]">
+        <div className="border-border flex gap-0.5 rounded-[9px] border bg-[hsl(40_8%_90%)] p-[2px] dark:bg-[hsl(240_5%_16%)]">
           <SegTab active={view === "history"} onClick={() => onChange("history")}>
             History
-            <span className="bg-[hsl(var(--background))] text-muted-foreground rounded-[5px] px-[5px] py-[1px] text-[11px] font-medium tabular-nums">
+            <span className="bg-muted text-muted-foreground rounded-[5px] px-[5px] py-[1px] text-[11px] font-medium tabular-nums">
               {historyCount}
             </span>
           </SegTab>
@@ -60,9 +60,9 @@ function SegTab({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex items-center gap-2 rounded-[7px] px-[15px] py-[6px] text-[13.5px] font-medium transition-colors",
+        "flex items-center gap-2 rounded-[7px] px-3 py-1 text-[13px] font-medium transition-colors",
         active
-          ? "bg-[hsl(var(--background))] text-foreground font-semibold shadow-[0_1px_2px_hsl(0_0%_0%/0.12)]"
+          ? "bg-card text-foreground font-semibold shadow-[0_1px_2px_hsl(0_0%_0%/0.14),0_0_0_0.5px_hsl(0_0%_0%/0.05)]"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
