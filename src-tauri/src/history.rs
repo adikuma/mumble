@@ -31,6 +31,9 @@ pub struct Transcript {
     /// foreground app exe name at paste time (e.g. `notepad.exe`). `NULL` when
     /// `auto_paste` is off or the capture failed.
     pub target_app: Option<String>,
+    /// full path to the foreground app exe at paste time. used to extract the
+    /// real app icon. `NULL` for old rows and when the capture failed.
+    pub target_app_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -81,7 +84,8 @@ impl HistoryStore {
                 input_device TEXT,
                 model TEXT NOT NULL,
                 latency_ms INTEGER,
-                target_app TEXT
+                target_app TEXT,
+                target_app_path TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_transcripts_created_at
                 ON transcripts(created_at DESC);
@@ -97,8 +101,8 @@ impl HistoryStore {
     pub fn insert(&self, t: &Transcript) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
-            "INSERT INTO transcripts (id, created_at, duration_sec, text, input_device, model, latency_ms, target_app)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO transcripts (id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 t.id,
                 t.created_at.to_rfc3339(),
@@ -108,6 +112,7 @@ impl HistoryStore {
                 t.model,
                 t.latency_ms,
                 t.target_app,
+                t.target_app_path,
             ],
         )?;
         Ok(())
@@ -117,7 +122,7 @@ impl HistoryStore {
         let conn = self.conn.lock();
         let (sql, like_param): (&str, String) = match query {
             Some(q) if !q.trim().is_empty() => (
-                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app
+                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
                  FROM transcripts
                  WHERE text LIKE ?1
                  ORDER BY created_at DESC
@@ -125,7 +130,7 @@ impl HistoryStore {
                 format!("%{}%", q),
             ),
             _ => (
-                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app
+                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
                  FROM transcripts
                  ORDER BY created_at DESC
                  LIMIT ?2",
@@ -292,6 +297,7 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         model: row.get(5)?,
         latency_ms: row.get(6)?,
         target_app: row.get(7)?,
+        target_app_path: row.get(8)?,
     })
 }
 
@@ -309,6 +315,12 @@ fn migrate(conn: &Connection) -> Result<()> {
     }
     if !cols.iter().any(|c| c == "target_app") {
         conn.execute("ALTER TABLE transcripts ADD COLUMN target_app TEXT", [])?;
+    }
+    if !cols.iter().any(|c| c == "target_app_path") {
+        conn.execute(
+            "ALTER TABLE transcripts ADD COLUMN target_app_path TEXT",
+            [],
+        )?;
     }
     Ok(())
 }

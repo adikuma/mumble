@@ -273,6 +273,79 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     out
 }
 
+// chunking constants for the transcribe path.
+// sherpa onnx with directml on parakeet tdt int8 silently returns empty for
+// audio over ~10 s. we cap each chunk at 6 s, with 200 ms overlap and a 1 s
+// silence search window so cuts land on low rms moments rather than mid word.
+const CHUNK_MAX_SEC: f32 = 6.0;
+const CHUNK_MIN_SEC: f32 = 4.0;
+const SEARCH_WINDOW_SEC: f32 = 1.0;
+const OVERLAP_MS: u32 = 200;
+const RMS_WINDOW_MS: u32 = 50;
+
+/// split a 16 kHz mono f32 buffer into chunks safe for sherpa onnx.
+///
+/// short audio (<= chunk_max + overlap) returns a single slice unchanged.
+/// longer audio is cut at the lowest rms point inside a 1 s search window
+/// near each ideal boundary so cuts fall on silence or breath, not mid word.
+/// each non final chunk overlaps the next by 200 ms so a word straddling the
+/// boundary still appears intact in one of them.
+pub fn chunk_for_transcription(samples: &[f32], sample_rate: u32) -> Vec<&[f32]> {
+    let chunk_max = (CHUNK_MAX_SEC * sample_rate as f32) as usize;
+    let chunk_min = (CHUNK_MIN_SEC * sample_rate as f32) as usize;
+    let search_window = (SEARCH_WINDOW_SEC * sample_rate as f32) as usize;
+    let overlap = (OVERLAP_MS as f32 / 1000.0 * sample_rate as f32) as usize;
+    let rms_window = (RMS_WINDOW_MS as f32 / 1000.0 * sample_rate as f32) as usize;
+
+    if samples.len() <= chunk_max + overlap {
+        return vec![samples];
+    }
+
+    let mut chunks: Vec<&[f32]> = Vec::new();
+    let mut start: usize = 0;
+    while start < samples.len() {
+        let ideal_end = start + chunk_max;
+        if ideal_end >= samples.len() {
+            chunks.push(&samples[start..]);
+            break;
+        }
+        // search the last 1 s of this window for the quietest spot, but never
+        // cut so close to start that we'd produce a chunk under chunk_min.
+        let search_floor = (start + chunk_min).min(ideal_end);
+        let search_start = ideal_end.saturating_sub(search_window).max(search_floor);
+        let cut = find_silence_point(samples, search_start, ideal_end, rms_window);
+        chunks.push(&samples[start..cut]);
+        // step forward but always make progress, even if overlap math would
+        // otherwise loop us back.
+        let next_start = cut.saturating_sub(overlap);
+        start = next_start.max(start + 1);
+    }
+    chunks
+}
+
+fn find_silence_point(samples: &[f32], start: usize, end: usize, win: usize) -> usize {
+    let mut min_rms = f32::MAX;
+    let mut min_idx = end;
+    let mut i = start;
+    while i + win <= end {
+        let r = window_rms(&samples[i..i + win]);
+        if r < min_rms {
+            min_rms = r;
+            min_idx = i + win / 2;
+        }
+        i += win;
+    }
+    min_idx
+}
+
+fn window_rms(slice: &[f32]) -> f32 {
+    if slice.is_empty() {
+        return 0.0;
+    }
+    let sum_sq: f32 = slice.iter().map(|s| s * s).sum();
+    (sum_sq / slice.len() as f32).sqrt()
+}
+
 /// write 16 kHz mono f32 samples as a 16 bit pcm wav file.
 #[allow(dead_code)]
 pub fn write_wav(path: &std::path::Path, samples: &[f32]) -> Result<()> {

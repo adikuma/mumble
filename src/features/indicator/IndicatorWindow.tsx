@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { MicIndicator } from "@/features/indicator/MicIndicator";
-import { onStateChanged, type AppState } from "@/lib/tauri";
+import {
+  onChunkProgress,
+  onStateChanged,
+  type AppState,
+  type ChunkProgressEvent,
+} from "@/lib/tauri";
 import { useTheme } from "@/components/theme-provider";
 
 /**
@@ -14,6 +19,7 @@ import { useTheme } from "@/components/theme-provider";
  */
 export function IndicatorWindow() {
   const [state, setState] = useState<AppState>("idle");
+  const [progress, setProgress] = useState<ChunkProgressEvent | null>(null);
   const { theme } = useTheme();
 
   const effectiveTheme: "light" | "dark" =
@@ -31,12 +37,24 @@ export function IndicatorWindow() {
   }, []);
 
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    onStateChanged((e) => setState(e.state)).then((u) => {
-      unlisten = u;
+    let unlistenState: (() => void) | null = null;
+    let unlistenProgress: (() => void) | null = null;
+    onStateChanged((e) => {
+      setState(e.state);
+      // reset progress when the pipeline returns to idle so the next
+      // recording starts with a clean "Transcribing..." label.
+      if (e.state === "idle" || e.state === "recording") {
+        setProgress(null);
+      }
+    }).then((u) => {
+      unlistenState = u;
+    });
+    onChunkProgress((e) => setProgress(e)).then((u) => {
+      unlistenProgress = u;
     });
     return () => {
-      unlisten?.();
+      unlistenState?.();
+      unlistenProgress?.();
     };
   }, []);
 
@@ -45,7 +63,11 @@ export function IndicatorWindow() {
       className="flex h-screen w-screen items-center justify-center"
       style={{ fontFamily: "var(--font-sans)", background: "transparent" }}
     >
-      <MicIndicator state={state} variant={effectiveTheme} />
+      <MicIndicator
+        state={state}
+        variant={effectiveTheme}
+        progress={progress}
+      />
     </div>
   );
 }

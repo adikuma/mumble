@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
-import { getMeter, isTauri, type AppState } from "@/lib/tauri";
+import {
+  getMeter,
+  isTauri,
+  type AppState,
+  type ChunkProgressEvent,
+} from "@/lib/tauri";
 
 interface MicIndicatorProps {
   state: AppState;
   variant: "light" | "dark";
   /** number of waveform bars. design uses 14. */
   bars?: number;
+  /** chunk progress while streaming a long recording. null if single chunk. */
+  progress?: ChunkProgressEvent | null;
 }
 
 /**
@@ -20,9 +27,16 @@ interface MicIndicatorProps {
  * light pill. white bg, hairline border, soft shadow.
  * dark pill. zinc 950 bg, softer shadow, lighter dot.
  */
-export function MicIndicator({ state, variant, bars = 14 }: MicIndicatorProps) {
+export function MicIndicator({
+  state,
+  variant,
+  bars = 14,
+  progress = null,
+}: MicIndicatorProps) {
   if (state === "transcribing" || state === "pasting") {
-    return <StatusPill state={state} variant={variant} />;
+    return (
+      <StatusPill state={state} variant={variant} progress={progress} />
+    );
   }
   return (
     <RecordingPill
@@ -91,11 +105,17 @@ function RecordingPill({
 function StatusPill({
   state,
   variant,
+  progress,
 }: {
   state: "transcribing" | "pasting";
   variant: "light" | "dark";
+  progress: ChunkProgressEvent | null;
 }) {
-  const label = state === "transcribing" ? "Transcribing" : "Pasting";
+  const base = state === "transcribing" ? "Transcribing" : "Pasting";
+  const showProgress = progress && progress.total > 1;
+  const label = showProgress
+    ? `${base} ${progress.current} / ${progress.total}`
+    : base;
   return (
     <div className={pillClasses(variant)} style={pillStyle(variant)}>
       <Loader2 className="size-3.5 shrink-0 animate-spin" strokeWidth={2.25} />

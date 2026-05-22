@@ -1,11 +1,12 @@
-//! best effort capture of the foreground window's exe name at paste time.
+//! best effort capture of the foreground window at paste time.
 //!
-//! used to populate the `target_app` column on transcript rows so the insights
-//! view can show "where you pasted". returns `None` on any failure. never
-//! blocks transcription on this.
+//! returns the exe display name and its full path. the name populates the
+//! `target_app` column so insights can show "where you pasted", the path lets
+//! the frontend extract the real app icon. returns `None` on any failure and
+//! never blocks transcription on this.
 
 #[cfg(windows)]
-pub fn current_foreground_app() -> Option<String> {
+pub fn current_foreground_app() -> Option<(String, String)> {
     use windows::Win32::Foundation::{CloseHandle, MAX_PATH};
     use windows::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
@@ -42,19 +43,20 @@ pub fn current_foreground_app() -> Option<String> {
         }
 
         let path = String::from_utf16_lossy(&buf[..size as usize]);
-        // strip the directory. "C:\Windows\notepad.exe" becomes "notepad.exe".
+        // strip the directory for the display name. "C:\Windows\notepad.exe"
+        // becomes "notepad.exe". keep the full path for icon extraction.
         let exe = std::path::Path::new(&path)
             .file_name()
             .map(|s| s.to_string_lossy().to_string())?;
         if exe.is_empty() {
             None
         } else {
-            Some(exe)
+            Some((exe, path))
         }
     }
 }
 
 #[cfg(not(windows))]
-pub fn current_foreground_app() -> Option<String> {
+pub fn current_foreground_app() -> Option<(String, String)> {
     None
 }

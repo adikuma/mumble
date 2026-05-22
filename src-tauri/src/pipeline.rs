@@ -47,6 +47,13 @@ pub struct ErrorEvent {
     pub message: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChunkProgressEvent {
+    pub current: u32,
+    pub total: u32,
+}
+
 pub struct Pipeline {
     pub state: Arc<SharedState>,
     pub capture: Arc<Mutex<Option<CaptureEngine>>>,
@@ -170,44 +177,115 @@ impl Pipeline {
         let settings = self.settings.get();
 
         tauri::async_runtime::spawn_blocking(move || {
-            let text = match &transcriber {
-                Some(t) => t.transcribe(&samples).unwrap_or_else(|e| {
-                    tracing::error!(?e, "transcribe failed");
-                    emit_error(&app, e.to_string());
-                    String::new()
-                }),
-                None => {
-                    emit_error(&app, "transcriber not initialised".into());
-                    String::new()
+            // chunk the audio so each piece stays under the sherpa onnx
+            // directml cliff (~10 s). short clips return one chunk and behave
+            // identically to the pre chunking path.
+            let chunks = crate::audio::chunk_for_transcription(&samples, 16_000);
+            let total = chunks.len() as u32;
+            tracing::info!(
+                total_chunks = total,
+                total_samples = samples.len(),
+                total_duration_sec = format!("{:.2}", samples.len() as f32 / 16_000.0),
+                "transcribe: chunked"
+            ); // TODO cleanup
+
+            // capture the foreground app and snapshot the clipboard before any
+            // paste keystrokes. once we synth Ctrl+V the focus may shift.
+            let (captured_app, captured_app_path) = if settings.auto_paste {
+                match target_app::current_foreground_app() {
+                    Some((name, path)) => (Some(name), Some(path)),
+                    None => (None, None),
                 }
+            } else {
+                (None, None)
             };
-
-            if text.is_empty() {
-                shared_state.set(AppState::Idle);
-                emit_state(&app, AppState::Idle);
-                hide_indicator(&app);
-                return;
-            }
-
-            shared_state.set(AppState::Pasting);
-            emit_state(&app, AppState::Pasting);
-
-            // capture the foreground app before we touch the clipboard or
-            // synth keystrokes. afterwards the focus may have shifted.
-            let captured_app = if settings.auto_paste {
-                target_app::current_foreground_app()
+            let prior_clipboard = if settings.auto_paste {
+                paste::snapshot_clipboard()
             } else {
                 None
             };
 
-            let paste_result = if settings.auto_paste {
-                paste::paste_text(&text)
-            } else {
-                paste::copy_only(&text)
-            };
-            if let Err(e) = paste_result {
-                tracing::error!(?e, "paste failed");
-                emit_error(&app, e.to_string());
+            shared_state.set(AppState::Pasting);
+            emit_state(&app, AppState::Pasting);
+
+            let mut accumulated = String::new();
+
+            for (i, chunk) in chunks.iter().enumerate() {
+                let idx = i as u32 + 1;
+                emit_chunk_progress(&app, idx, total);
+                tracing::info!(
+                    chunk = idx,
+                    of = total,
+                    samples = chunk.len(),
+                    duration_sec = format!("{:.2}", chunk.len() as f32 / 16_000.0),
+                    "transcribe: chunk"
+                ); // TODO cleanup
+
+                let text = match &transcriber {
+                    Some(t) => t.transcribe(chunk).unwrap_or_else(|e| {
+                        tracing::error!(?e, "transcribe failed");
+                        emit_error(&app, e.to_string());
+                        String::new()
+                    }),
+                    None => {
+                        emit_error(&app, "transcriber not initialised".into());
+                        String::new()
+                    }
+                };
+
+                if text.is_empty() {
+                    tracing::warn!(
+                        chunk = idx,
+                        of = total,
+                        "chunk returned empty, skipping"
+                    ); // TODO cleanup
+                    continue;
+                }
+
+                let leading_space = !accumulated.is_empty();
+                if leading_space {
+                    accumulated.push(' ');
+                }
+                accumulated.push_str(&text);
+
+                if settings.auto_paste {
+                    if let Err(e) = paste::paste_chunk(&text, leading_space) {
+                        tracing::error!(?e, "paste_chunk failed");
+                        emit_error(&app, e.to_string());
+                    }
+                }
+            }
+
+            // restore the clipboard once after every paste lands. for the
+            // copy only path, write the joined transcript to the clipboard
+            // so the user can manually paste it wherever they want.
+            if settings.auto_paste {
+                if let Err(e) = paste::restore_clipboard(prior_clipboard) {
+                    tracing::error!(?e, "restore_clipboard failed");
+                }
+            } else if !accumulated.trim().is_empty() {
+                if let Err(e) = paste::copy_only(accumulated.trim()) {
+                    tracing::error!(?e, "copy_only failed");
+                    emit_error(&app, e.to_string());
+                }
+            }
+
+            let trimmed = accumulated.trim().to_string();
+
+            if trimmed.is_empty() {
+                tracing::warn!(
+                    samples = samples.len(),
+                    press_duration_sec,
+                    "all chunks returned empty, no transcript produced"
+                );
+                emit_error(
+                    &app,
+                    "Transcription returned empty. Try a shorter recording or check the dev terminal for sherpa onnx errors.".into(),
+                );
+                shared_state.set(AppState::Idle);
+                emit_state(&app, AppState::Idle);
+                hide_indicator(&app);
+                return;
             }
 
             let latency_ms = Some(release_time.elapsed().as_millis() as i64);
@@ -216,7 +294,7 @@ impl Pipeline {
                 id: new_id(),
                 created_at: Utc::now(),
                 duration_sec: press_duration_sec,
-                text: text.clone(),
+                text: trimmed.clone(),
                 input_device: settings.input_device.clone(),
                 model: transcriber
                     .as_ref()
@@ -224,6 +302,7 @@ impl Pipeline {
                     .unwrap_or_else(|| "unknown".into()),
                 latency_ms,
                 target_app: captured_app,
+                target_app_path: captured_app_path,
             };
             if let Err(e) = history.insert(&transcript) {
                 tracing::error!(?e, "history.insert failed");
@@ -265,6 +344,13 @@ fn emit_state(app: &AppHandle, state: AppState) {
 
 fn emit_error(app: &AppHandle, message: String) {
     let _ = app.emit("mumble://error", ErrorEvent { message });
+}
+
+fn emit_chunk_progress(app: &AppHandle, current: u32, total: u32) {
+    let _ = app.emit(
+        "mumble://chunk-progress",
+        ChunkProgressEvent { current, total },
+    );
 }
 
 /// show the indicator at the bottom center of the active monitor.

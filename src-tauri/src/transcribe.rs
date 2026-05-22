@@ -21,13 +21,13 @@ pub trait Transcriber: Send + Sync {
 pub fn load(model_dir: PathBuf) -> Result<Box<dyn Transcriber>> {
     #[cfg(all(windows, not(feature = "mock-transcribe")))]
     {
-        return ParakeetTranscriber::new(model_dir).map(|t| Box::new(t) as Box<dyn Transcriber>);
+        ParakeetTranscriber::new(model_dir).map(|t| Box::new(t) as Box<dyn Transcriber>)
     }
 
     #[cfg(any(not(windows), feature = "mock-transcribe"))]
     {
         let _ = model_dir;
-        return Ok(Box::new(MockTranscriber));
+        Ok(Box::new(MockTranscriber))
     }
 }
 
@@ -80,8 +80,29 @@ mod real {
     impl Transcriber for ParakeetTranscriber {
         fn transcribe(&self, samples: &[f32]) -> Result<String> {
             let mut rec = self.inner.lock();
+            let duration_sec = samples.len() as f32 / 16_000.0;
+            let started = std::time::Instant::now();
+            tracing::info!(
+                samples = samples.len(),
+                duration_sec = format!("{duration_sec:.2}"),
+                "transcribe: input"
+            );
             let text = rec.transcribe(16_000, samples);
-            Ok(text.trim().to_string())
+            let trimmed = text.trim().to_string();
+            tracing::info!(
+                ms = started.elapsed().as_millis() as u64,
+                output_len = trimmed.len(),
+                preview = trimmed.chars().take(80).collect::<String>(),
+                "transcribe: output"
+            );
+            if trimmed.is_empty() && duration_sec > 0.5 {
+                tracing::warn!(
+                    duration_sec = format!("{duration_sec:.2}"),
+                    "transcribe returned empty for non trivial audio. \
+                     likely sherpa onnx silent failure (directml tensor limit?)"
+                );
+            }
+            Ok(trimmed)
         }
     }
 }
@@ -91,8 +112,10 @@ pub use real::ParakeetTranscriber;
 
 // mock backend (non windows or explicit feature flag)
 
+#[cfg(any(not(windows), feature = "mock-transcribe"))]
 pub struct MockTranscriber;
 
+#[cfg(any(not(windows), feature = "mock-transcribe"))]
 impl Transcriber for MockTranscriber {
     fn transcribe(&self, samples: &[f32]) -> Result<String> {
         let duration = samples.len() as f32 / 16_000.0;
