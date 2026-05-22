@@ -15,7 +15,7 @@ export function TabBar({ view, onChange, historyCount }: TabBarProps) {
   return (
     <div className="bg-background flex h-[46px] shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-3">
       <div className="flex items-center gap-3">
-        <Logo size={22} className="ml-1" />
+        <Logo size={28} className="ml-1" />
         <div className="border-border flex gap-0.5 rounded-[9px] border bg-[hsl(40_8%_90%)] p-[2px] dark:bg-[hsl(240_5%_16%)]">
           <SegTab active={view === "history"} onClick={() => onChange("history")}>
             History
