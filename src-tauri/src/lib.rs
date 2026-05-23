@@ -1,6 +1,7 @@
 pub mod app_icons;
 mod audio;
 mod commands;
+mod dictionary;
 mod history;
 mod hotkey;
 mod model_download;
@@ -173,6 +174,11 @@ pub fn run() {
             commands::model_status,
             commands::get_insights,
             commands::get_app_icon,
+            commands::list_dictionary,
+            commands::add_dictionary_entry,
+            commands::update_dictionary_entry,
+            commands::delete_dictionary_entry,
+            commands::update_transcript,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

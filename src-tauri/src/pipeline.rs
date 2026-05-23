@@ -208,6 +208,10 @@ impl Pipeline {
             shared_state.set(AppState::Pasting);
             emit_state(&app, AppState::Pasting);
 
+            // load the dictionary once. apply it to each chunk so both the
+            // streamed paste and the stored transcript come out corrected.
+            let dict = history.list_dictionary().unwrap_or_default();
+
             let mut accumulated = String::new();
 
             for (i, chunk) in chunks.iter().enumerate() {
@@ -232,6 +236,9 @@ impl Pipeline {
                         String::new()
                     }
                 };
+
+                // run the custom dictionary over this chunk before paste.
+                let text = crate::dictionary::apply(&text, &dict);
 
                 if text.is_empty() {
                     tracing::warn!(

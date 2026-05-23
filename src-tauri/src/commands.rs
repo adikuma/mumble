@@ -6,6 +6,7 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::audio;
+use crate::dictionary::{Correction, DictEntry};
 use crate::history::{HistoryStore, InsightsData, Transcript};
 use crate::hotkey::HotkeyListener;
 use crate::model_download;
@@ -217,4 +218,56 @@ pub struct ModelStatus {
     pub present: bool,
     pub path: String,
     pub name: String,
+}
+
+#[tauri::command]
+pub fn list_dictionary(history: State<'_, HistoryStore>) -> Result<Vec<DictEntry>, String> {
+    history.list_dictionary().map_err(err)
+}
+
+#[tauri::command]
+pub fn add_dictionary_entry(
+    history: State<'_, HistoryStore>,
+    pattern: String,
+    replacement: String,
+    case_sensitive: bool,
+    fuzzy: bool,
+) -> Result<DictEntry, String> {
+    history
+        .add_dictionary_entry(pattern.trim(), replacement.trim(), case_sensitive, fuzzy)
+        .map_err(err)
+}
+
+#[tauri::command]
+pub fn update_dictionary_entry(
+    history: State<'_, HistoryStore>,
+    id: i64,
+    pattern: String,
+    replacement: String,
+    case_sensitive: bool,
+    fuzzy: bool,
+) -> Result<(), String> {
+    history
+        .update_dictionary_entry(id, pattern.trim(), replacement.trim(), case_sensitive, fuzzy)
+        .map_err(err)
+}
+
+#[tauri::command]
+pub fn delete_dictionary_entry(history: State<'_, HistoryStore>, id: i64) -> Result<(), String> {
+    history.delete_dictionary_entry(id).map_err(err)
+}
+
+// persist a transcript edit and return suggested corrections (wrong to
+// right pairs) for the frontend to offer adding to the dictionary.
+#[tauri::command]
+pub fn update_transcript(
+    history: State<'_, HistoryStore>,
+    id: String,
+    text: String,
+) -> Result<Vec<Correction>, String> {
+    let prev = history.update_transcript_text(&id, &text).map_err(err)?;
+    match prev {
+        Some(original) => Ok(crate::dictionary::extract_corrections(&original, &text)),
+        None => Err("transcript not found".into()),
+    }
 }

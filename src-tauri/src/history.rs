@@ -13,6 +13,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::dictionary::DictEntry;
 use crate::paths;
 
 #[derive(Clone, Debug, Serialize)]
@@ -72,7 +73,16 @@ impl HistoryStore {
         let path = paths::history_db_path()?;
         let conn = Connection::open(&path)
             .with_context(|| format!("open sqlite at {}", path.display()))?;
+        Self::from_connection(conn)
+    }
 
+    #[cfg(test)]
+    pub fn open_in_memory() -> Result<Self> {
+        let conn = Connection::open_in_memory()?;
+        Self::from_connection(conn)
+    }
+
+    fn from_connection(conn: Connection) -> Result<Self> {
         // fresh dbs get the full schema. existing dbs get migrated below.
         conn.execute_batch(
             r#"
@@ -89,6 +99,15 @@ impl HistoryStore {
             );
             CREATE INDEX IF NOT EXISTS idx_transcripts_created_at
                 ON transcripts(created_at DESC);
+            CREATE TABLE IF NOT EXISTS dictionary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern TEXT NOT NULL UNIQUE,
+                replacement TEXT NOT NULL,
+                case_sensitive INTEGER NOT NULL DEFAULT 0,
+                fuzzy INTEGER NOT NULL DEFAULT 0,
+                hits INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
             "#,
         )?;
         migrate(&conn)?;
@@ -161,7 +180,7 @@ impl HistoryStore {
     pub fn get(&self, id: &str) -> Result<Option<Transcript>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app
+            "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
              FROM transcripts WHERE id = ?1",
         )?;
         let mut rows = stmt.query(params![id])?;
@@ -170,6 +189,106 @@ impl HistoryStore {
         } else {
             Ok(None)
         }
+    }
+
+    // update a transcript's text in place and return the previous text so
+    // the caller can diff it for learning. returns None if the id is unknown.
+    pub fn update_transcript_text(&self, id: &str, text: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let prev: Option<String> = conn
+            .query_row(
+                "SELECT text FROM transcripts WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .ok();
+        if prev.is_none() {
+            return Ok(None);
+        }
+        conn.execute(
+            "UPDATE transcripts SET text = ?2 WHERE id = ?1",
+            params![id, text],
+        )?;
+        Ok(prev)
+    }
+
+    pub fn list_dictionary(&self) -> Result<Vec<DictEntry>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, pattern, replacement, case_sensitive, fuzzy
+             FROM dictionary ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(DictEntry {
+                id: row.get(0)?,
+                pattern: row.get(1)?,
+                replacement: row.get(2)?,
+                case_sensitive: row.get::<_, i64>(3)? != 0,
+                fuzzy: row.get::<_, i64>(4)? != 0,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .context("collect dictionary")
+    }
+
+    pub fn add_dictionary_entry(
+        &self,
+        pattern: &str,
+        replacement: &str,
+        case_sensitive: bool,
+        fuzzy: bool,
+    ) -> Result<DictEntry> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO dictionary (pattern, replacement, case_sensitive, fuzzy, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(pattern) DO UPDATE SET
+                replacement = excluded.replacement,
+                case_sensitive = excluded.case_sensitive,
+                fuzzy = excluded.fuzzy",
+            params![
+                pattern,
+                replacement,
+                case_sensitive as i64,
+                fuzzy as i64,
+                Utc::now().to_rfc3339()
+            ],
+        )?;
+        let id = conn.query_row(
+            "SELECT id FROM dictionary WHERE pattern = ?1",
+            params![pattern],
+            |r| r.get(0),
+        )?;
+        Ok(DictEntry {
+            id,
+            pattern: pattern.to_string(),
+            replacement: replacement.to_string(),
+            case_sensitive,
+            fuzzy,
+        })
+    }
+
+    pub fn update_dictionary_entry(
+        &self,
+        id: i64,
+        pattern: &str,
+        replacement: &str,
+        case_sensitive: bool,
+        fuzzy: bool,
+    ) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE dictionary SET pattern = ?2, replacement = ?3, case_sensitive = ?4, fuzzy = ?5
+             WHERE id = ?1",
+            params![id, pattern, replacement, case_sensitive as i64, fuzzy as i64],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_dictionary_entry(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM dictionary WHERE id = ?1", params![id])?;
+        Ok(())
     }
 
     /// aggregate metrics for the last `range_days` days. computed in rust
@@ -335,3 +454,46 @@ const STOPWORDS: &[&str] = &[
     "his", "its", "any", "all", "some", "one", "two", "three", "four", "five", "yeah", "okay",
     "ok", "right", "well", "like",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dictionary_crud_roundtrip() {
+        let store = HistoryStore::open_in_memory().unwrap();
+        let e = store
+            .add_dictionary_entry("klema", "Kléma", false, false)
+            .unwrap();
+        assert_eq!(e.pattern, "klema");
+        let all = store.list_dictionary().unwrap();
+        assert_eq!(all.len(), 1);
+        store
+            .update_dictionary_entry(e.id, "klema", "Klema", true, false)
+            .unwrap();
+        assert_eq!(store.list_dictionary().unwrap()[0].replacement, "Klema");
+        store.delete_dictionary_entry(e.id).unwrap();
+        assert!(store.list_dictionary().unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_transcript_text_returns_previous() {
+        let store = HistoryStore::open_in_memory().unwrap();
+        let t = Transcript {
+            id: "t1".into(),
+            created_at: Utc::now(),
+            duration_sec: 1.0,
+            text: "call klema".into(),
+            input_device: None,
+            model: "test".into(),
+            latency_ms: None,
+            target_app: None,
+            target_app_path: None,
+        };
+        store.insert(&t).unwrap();
+        let prev = store.update_transcript_text("t1", "call Kléma").unwrap();
+        assert_eq!(prev.as_deref(), Some("call klema"));
+        assert_eq!(store.get("t1").unwrap().unwrap().text, "call Kléma");
+        assert!(store.update_transcript_text("missing", "x").unwrap().is_none());
+    }
+}
