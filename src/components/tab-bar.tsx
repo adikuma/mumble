@@ -35,8 +35,8 @@ export function TabBar({ view, onChange, historyCount }: TabBarProps) {
           aria-label="Settings"
           aria-pressed={view === "settings"}
           className={cn(
-            "flex h-[30px] w-[30px] items-center justify-center rounded-[7px] border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-muted-foreground transition-colors hover:bg-[hsl(var(--accent))] hover:text-foreground",
-            view === "settings" && "bg-[hsl(var(--accent))] text-foreground",
+            "flex h-[30px] w-[30px] items-center justify-center rounded-[7px] bg-card text-muted-foreground shadow-[0_1px_2px_hsl(0_0%_0%/0.14),0_0_0_0.5px_hsl(0_0%_0%/0.05)] transition-colors hover:text-foreground",
+            view === "settings" && "text-foreground",
           )}
         >
           <SettingsIcon className="size-4" strokeWidth={2} />
