@@ -46,22 +46,23 @@ export function HistoryView() {
 
   return (
     <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
-      <div className="mx-auto w-full max-w-[640px] px-6 pt-6 pb-16">
-        <div className="bg-card border-border shadow-lift mb-3 flex h-10 items-center gap-2.5 rounded-[10px] border px-3.5">
-          <Search className="text-muted-foreground size-4" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search transcripts"
-            className="placeholder:text-muted-foreground text-foreground flex-1 bg-transparent text-[13.5px] outline-none"
-          />
-          <span className="border-border text-muted-foreground rounded-[5px] border px-1.5 py-px text-[11px]">
-            Ctrl K
-          </span>
-        </div>
+      <div className="mx-auto w-full max-w-[640px] px-6 pb-16">
+        <div className="bg-background border-border sticky top-0 z-10 -mx-6 border-b px-6 pt-6 pb-3">
+          <div className="bg-card border-border shadow-lift flex h-10 items-center gap-2.5 rounded-[10px] border px-3.5">
+            <Search className="text-muted-foreground size-4" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search transcripts"
+              className="placeholder:text-muted-foreground text-foreground flex-1 bg-transparent text-[13.5px] outline-none"
+            />
+            <span className="border-border text-muted-foreground rounded-[5px] border px-1.5 py-px text-[11px]">
+              Ctrl K
+            </span>
+          </div>
 
-        <div className="mb-5 flex justify-end">
-          <Dialog>
+          <div className="mt-2.5 flex justify-end">
+            <Dialog>
             <DialogTrigger asChild>
               <button className="text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs">
                 <Trash2 className="size-3.5" />
@@ -83,6 +84,7 @@ export function HistoryView() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {groups.map((g) => (
