@@ -1,0 +1,158 @@
+/*
+ * Mumble Design System — Colors + Type
+ * Verbatim from src/index.css on feature/mumble-backend (shadcn New York,
+ * neutral/zinc-style 240-hue grays). Default radius 0.5rem.
+ *
+ * Brief overrides one thing: font stack is Geist Sans only — no mono.
+ * Timers/shortcuts must render in regular Geist with `font-variant-numeric:
+ * tabular-nums`, not in a separate mono face.
+ */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/Geist-Variable.woff2") format("woff2-variations");
+}
+
+:root {
+  /* ─── Base ─────────────────────────────────────────────── */
+  --radius: 0.5rem;
+
+  --font-sans:
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* No mono. Timers + shortcuts use --font-sans + tabular-nums. */
+  --font-mono: var(--font-sans);
+
+  /* ─── Color tokens (shadcn neutral / light) ────────────── */
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(240 10% 3.9%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(240 10% 3.9%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(240 10% 3.9%);
+
+  --primary: hsl(240 5.9% 10%);
+  --primary-foreground: hsl(0 0% 98%);
+
+  --secondary: hsl(240 4.8% 95.9%);
+  --secondary-foreground: hsl(240 5.9% 10%);
+
+  --muted: hsl(240 4.8% 95.9%);
+  --muted-foreground: hsl(240 3.8% 46.1%);
+
+  --accent: hsl(240 4.8% 95.9%);
+  --accent-foreground: hsl(240 5.9% 10%);
+
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(0 0% 98%);
+
+  --border: hsl(240 5.9% 90%);
+  --input: hsl(240 5.9% 90%);
+  --ring: hsl(240 5.9% 10%);
+
+  /* Sidebar — warmer cream tone (Claude-light reference). Intentionally
+   * overrides the brief's "no warm cream" rule per user feedback so the
+   * sidebar reads as a separate, calmer plane. */
+  --sidebar: hsl(48 33% 97%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-border: hsl(40 15% 90%);
+  --sidebar-accent: hsl(45 25% 92%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-ring: hsl(240 5.9% 10%);
+
+  /* ─── Type scale (semantic) ────────────────────────────── */
+  /* The product is a system utility — small, tight, dense. Never larger
+   * than 18px in real surfaces. */
+  --text-xs: 11px;     /* meta, footer chips */
+  --text-sm: 13px;     /* body default, list rows, settings labels */
+  --text-base: 15px;   /* transcript detail body */
+  --text-lg: 18px;     /* settings page heading */
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --tracking-tight: -0.01em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+}
+
+.dark {
+  --background: hsl(240 10% 3.9%);
+  --foreground: hsl(0 0% 98%);
+
+  --card: hsl(240 10% 3.9%);
+  --card-foreground: hsl(0 0% 98%);
+
+  --popover: hsl(240 10% 3.9%);
+  --popover-foreground: hsl(0 0% 98%);
+
+  --primary: hsl(0 0% 98%);
+  --primary-foreground: hsl(240 5.9% 10%);
+
+  --secondary: hsl(240 3.7% 15.9%);
+  --secondary-foreground: hsl(0 0% 98%);
+
+  --muted: hsl(240 3.7% 15.9%);
+  --muted-foreground: hsl(240 5% 64.9%);
+
+  --accent: hsl(240 3.7% 15.9%);
+  --accent-foreground: hsl(0 0% 98%);
+
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(0 0% 98%);
+
+  --border: hsl(240 3.7% 15.9%);
+  --input: hsl(240 3.7% 15.9%);
+  --ring: hsl(240 4.9% 83.9%);
+
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(0 0% 98%);
+  --sidebar-ring: hsl(240 4.9% 83.9%);
+}
+
+/* ─── Base typography ──────────────────────────────────────
+ * Apply --font-sans globally; rely on font-variant-numeric:tabular-nums
+ * anywhere a number column or timer needs steady width.
+ */
+html, body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+h1, .h1 { font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); }
+h2, .h2 { font-size: 15px; font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); }
+h3, .h3 { font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: var(--leading-tight); letter-spacing: -0.005em; }
+p, .p { font-size: var(--text-sm); line-height: var(--leading-normal); }
+.text-meta { font-size: var(--text-xs); color: var(--muted-foreground); }
+.text-body { font-size: var(--text-base); line-height: var(--leading-relaxed); }
+
+/* Numerals must always be tabular when they sit in a row of similar values
+ * (timers, durations, sizes). */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* kbd / shortcut chip */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}

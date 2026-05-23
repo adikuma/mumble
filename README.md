@@ -4,7 +4,7 @@ A Hex-style push-to-talk voice dictation app for Windows. Hold a hotkey, speak, 
 
 Written in Rust (Tauri backend) + React (webview UI). ASR runs through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) on [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3).
 
-> **Status:** milestone 1 — UI scaffold only. The Rust backend (hotkey, WASAPI capture, transcription, paste) lands in milestone 2+.
+> **Status:** milestone 2 — full backend landed. Hotkey listener, WASAPI capture with pre-roll ring buffer, Parakeet-TDT transcription, clipboard-safe paste, SQLite history, system tray, floating mic indicator, settings persistence, model auto-download. Requires Windows to run end-to-end.
 
 ## Stack
 
@@ -48,12 +48,28 @@ node scripts/screenshots.mjs
 
 ```
 src/                     React frontend
-  components/ui/         shadcn-style primitives
+  components/ui/         shadcn-style primitives (button, card, dialog, …)
   features/
-    history/             History view + sample data
-    settings/            Settings view
-    indicator/           Floating mic indicator
-src-tauri/               Rust backend (milestone 2+)
+    history/             History view (SQLite-backed, live search)
+    settings/            Settings (hotkey rebind, device picker, startup, model)
+    indicator/           Floating mic indicator (standalone window)
+  lib/tauri.ts           Typed IPC wrappers (invoke + listen)
+  lib/useBackendBridge   Event → Zustand bridge
+  store.ts               Zustand global state
+src-tauri/src/
+  state.rs               Lock-free AppState (Idle/Recording/Transcribing/Pasting)
+  settings.rs            JSON persistence in %APPDATA%\Mumble
+  history.rs             SQLite schema + CRUD
+  paths.rs               OS paths (data dir, models dir)
+  audio.rs               cpal WASAPI capture + 1 s ring buffer + resample
+  hotkey.rs              rdev global listener (press/release, rebindable)
+  paste.rs               arboard snapshot + enigo Ctrl+V + restore
+  transcribe.rs          sherpa-onnx Parakeet-TDT (mock on non-Windows)
+  model_download.rs      First-run asset download with progress events
+  pipeline.rs            Hotkey → record → transcribe → paste state machine
+  tray.rs                System tray icon + menu
+  commands.rs            #[tauri::command] handlers (IPC surface)
+  lib.rs                 Setup: plugins, managed state, tray, hotkey listener
 docs/
   e2e/                   Per-milestone manual test checklists
   screenshots/           Per-milestone UI screenshots

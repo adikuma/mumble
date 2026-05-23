@@ -2,136 +2,154 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* geist sans. single variable face. no mono companion.
+ * timers and shortcuts render in regular geist with `tabular-nums`. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Geist-Variable.woff2") format("woff2-variations");
+}
+
 @theme inline {
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    monospace;
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable",
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-sans);
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
 
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* type scale. desktop utility, smaller than web defaults.
+   * 11, 13, 15, 18 px. */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
 }
 
-/* Light mode — warm cream canvas, white cards, tan sidebar */
+/* all color tokens are bare hsl triplets. the @theme inline block above wraps
+ * them in hsl() for tailwind utilities, and raw css below wraps them too. this
+ * lets both `bg-card` and `bg-[hsl(var(--muted))]` resolve correctly. */
+
+/* light mode. tinted warm canvas so white cards float above the background.
+ * sidebar stays warm cream as the distinct plane. indigo primary for focus. */
 :root {
-  --radius: 10px;
+  --radius: 0.625rem;
 
-  --background: hsl(40 30% 98.5%);
-  --foreground: hsl(24 10% 10%);
+  --background: 40 14% 95.5%;
+  --foreground: 0 0% 9%;
 
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(24 10% 10%);
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
 
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(24 10% 10%);
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
 
-  --primary: hsl(24 10% 10%);
-  --primary-foreground: hsl(40 30% 98.5%);
+  --primary: 248 53% 58%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: hsl(35 15% 94%);
-  --secondary-foreground: hsl(24 10% 10%);
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
 
-  --muted: hsl(35 15% 94%);
-  --muted-foreground: hsl(25 5% 45%);
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 45%;
 
-  --accent: hsl(35 15% 94%);
-  --accent-foreground: hsl(24 10% 10%);
+  --accent: 48 25% 94%;
+  --accent-foreground: 0 0% 12%;
 
-  --destructive: hsl(0 72% 45%);
-  --destructive-foreground: hsl(40 30% 98.5%);
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
 
-  --border: hsl(30 15% 89%);
-  --input: hsl(30 15% 89%);
-  --ring: hsl(160 70% 36%);
+  --border: 0 0% 91%;
+  --border-strong: 0 0% 85%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5.9% 10%;
 
-  --brand: hsl(160 70% 36%);
-  --brand-foreground: hsl(0 0% 100%);
-
-  --sidebar: hsl(35 22% 95%);
-  --sidebar-foreground: hsl(24 10% 15%);
-  --sidebar-border: hsl(30 15% 86%);
-  --sidebar-accent: hsl(35 18% 90%);
-  --sidebar-accent-foreground: hsl(24 10% 10%);
-  --sidebar-ring: hsl(160 70% 36%);
+  --sidebar: 48 33% 97%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-border: 40 15% 90%;
+  --sidebar-accent: 45 25% 92%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-ring: 240 5.9% 10%;
 }
 
-/* Dark mode — shadcn zinc defaults, sidebar lifts ~1.5% from canvas */
+/* dark mode. lifted near black content area, sidebar pushed darker as
+ * the deeper plane (linear, discord, vs code convention). */
 .dark {
-  --background: hsl(0 0% 3.9%);
-  --foreground: hsl(0 0% 98%);
+  --background: 240 6% 10%;
+  --foreground: 0 0% 95%;
 
-  --card: hsl(0 0% 6%);
-  --card-foreground: hsl(0 0% 98%);
+  --card: 240 5% 14.5%;
+  --card-foreground: 0 0% 95%;
 
-  --popover: hsl(0 0% 6%);
-  --popover-foreground: hsl(0 0% 98%);
+  --popover: 240 6% 9%;
+  --popover-foreground: 0 0% 98%;
 
-  --primary: hsl(0 0% 98%);
-  --primary-foreground: hsl(0 0% 9%);
+  --primary: 248 70% 72%;
+  --primary-foreground: 240 6% 10%;
 
-  --secondary: hsl(0 0% 14.9%);
-  --secondary-foreground: hsl(0 0% 98%);
+  --secondary: 240 4% 15%;
+  --secondary-foreground: 0 0% 98%;
 
-  --muted: hsl(0 0% 14.9%);
-  --muted-foreground: hsl(0 0% 63.9%);
+  --muted: 240 5% 18%;
+  --muted-foreground: 240 5% 60%;
 
-  --accent: hsl(0 0% 14.9%);
-  --accent-foreground: hsl(0 0% 98%);
+  --accent: 240 5% 19%;
+  --accent-foreground: 0 0% 96%;
 
-  --destructive: hsl(0 72% 51%);
-  --destructive-foreground: hsl(0 0% 98%);
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
 
-  --border: hsl(0 0% 14.9%);
-  --input: hsl(0 0% 14.9%);
-  --ring: hsl(160 84% 39%);
+  --border: 240 4% 19%;
+  --border-strong: 240 4% 24%;
+  --input: 240 4% 18%;
+  --ring: 240 4.9% 83.9%;
 
-  --brand: hsl(160 84% 39%);
-  --brand-foreground: hsl(0 0% 5%);
-
-  --sidebar: hsl(0 0% 5.5%);
-  --sidebar-foreground: hsl(0 0% 85%);
-  --sidebar-border: hsl(0 0% 10%);
-  --sidebar-accent: hsl(0 0% 10%);
-  --sidebar-accent-foreground: hsl(0 0% 98%);
-  --sidebar-ring: hsl(160 84% 39%);
+  --sidebar: 240 6% 9%;
+  --sidebar-foreground: 240 5% 88%;
+  --sidebar-border: 240 6% 9%;
+  --sidebar-accent: 240 6% 11%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-ring: 240 4.9% 83.9%;
 }
 
 @layer base {
   * {
-    border-color: var(--border);
+    border-color: hsl(var(--border));
+    /* disable overscroll bounce so the webview2 surface never reveals
+     * the layer behind the window when the user scrolls past content. */
+    overscroll-behavior: none;
   }
   html,
   body,
@@ -139,8 +157,8 @@
     height: 100%;
   }
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: var(--font-sans);
     font-feature-settings:
       "rlig" 1,
@@ -148,7 +166,79 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  ::selection {
-    background-color: color-mix(in srgb, var(--brand) 25%, transparent);
+
+  /* hide the os scrollbars across all scrollable surfaces. scrolling still
+   * works. the chrome just isn't visible. match the design's clean
+   * borderless aesthetic. */
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}
+
+/* the indicator window is a separate tauri webview at `#/indicator`.
+ * tauri marks it transparent but the global body background paints over
+ * the top. this class (added by `IndicatorWindow` on mount) makes the
+ * html, body, and root chain truly transparent so only the pill is visible. */
+body.indicator-window,
+body.indicator-window html,
+body.indicator-window #root {
+  background: transparent !important;
+}
+
+/* tabular numerals for any column of numbers (timers, sizes, durations). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* keyboard shortcut chip. */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer utilities {
+  .shadow-lift {
+    box-shadow:
+      0 1px 2px hsl(40 10% 45% / 0.05),
+      0 2px 5px hsl(40 10% 40% / 0.045);
+  }
+  .dark .shadow-lift {
+    box-shadow:
+      0 1px 2px hsl(0 0% 0% / 0.22),
+      0 2px 6px hsl(0 0% 0% / 0.2);
+  }
+  .shadow-lift-hover {
+    box-shadow:
+      0 2px 6px hsl(40 10% 40% / 0.09),
+      0 6px 16px hsl(40 10% 40% / 0.08);
+  }
+  .dark .shadow-lift-hover {
+    box-shadow:
+      0 3px 10px hsl(0 0% 0% / 0.34),
+      0 10px 24px hsl(0 0% 0% / 0.3);
+  }
+
+  @keyframes mumble-flash {
+    0% {
+      background-color: hsl(248 53% 58% / 0.35);
+    }
+    100% {
+      background-color: hsl(248 53% 58% / 0);
+    }
   }
 }

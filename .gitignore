@@ -15,6 +15,9 @@ src-tauri/target
 test-results
 playwright-report
 
+.superpowers/
+docs/superpowers/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -25,3 +28,10 @@ playwright-report
 *.njsproj
 *.sln
 *.sw?
+
+# opensrc - source code for packages
+opensrc/
+AGENTS.md
+
+# rust-analyzer cache (root)
+target/
