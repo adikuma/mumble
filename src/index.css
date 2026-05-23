@@ -232,4 +232,13 @@ body.indicator-window #root {
       0 3px 10px hsl(0 0% 0% / 0.34),
       0 10px 24px hsl(0 0% 0% / 0.3);
   }
+
+  @keyframes mumble-flash {
+    0% {
+      background-color: hsl(248 53% 58% / 0.35);
+    }
+    100% {
+      background-color: hsl(248 53% 58% / 0);
+    }
+  }
 }

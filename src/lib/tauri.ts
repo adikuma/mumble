@@ -26,6 +26,19 @@ export interface Transcript {
   targetAppPath?: string | null;
 }
 
+export interface DictEntry {
+  id: number;
+  pattern: string;
+  replacement: string;
+  caseSensitive: boolean;
+  fuzzy: boolean;
+}
+
+export interface Correction {
+  original: string;
+  corrected: string;
+}
+
 export interface DeviceInfo {
   name: string;
   isDefault: boolean;
@@ -108,6 +121,45 @@ export const copyTranscript = (id: string): Promise<void> =>
 
 export const repasteTranscript = (id: string): Promise<void> =>
   safeInvoke("repaste_transcript", { id });
+
+export const updateTranscript = (
+  id: string,
+  text: string,
+): Promise<Correction[]> => safeInvoke("update_transcript", { id, text });
+
+export const listDictionary = (): Promise<DictEntry[]> =>
+  safeInvoke("list_dictionary");
+
+export const addDictionaryEntry = (
+  pattern: string,
+  replacement: string,
+  caseSensitive = false,
+  fuzzy = false,
+): Promise<DictEntry> =>
+  safeInvoke("add_dictionary_entry", {
+    pattern,
+    replacement,
+    caseSensitive,
+    fuzzy,
+  });
+
+export const updateDictionaryEntry = (
+  id: number,
+  pattern: string,
+  replacement: string,
+  caseSensitive: boolean,
+  fuzzy: boolean,
+): Promise<void> =>
+  safeInvoke("update_dictionary_entry", {
+    id,
+    pattern,
+    replacement,
+    caseSensitive,
+    fuzzy,
+  });
+
+export const deleteDictionaryEntry = (id: number): Promise<void> =>
+  safeInvoke("delete_dictionary_entry", { id });
 
 export const hideMainWindow = (): Promise<void> =>
   safeInvoke("hide_main_window");

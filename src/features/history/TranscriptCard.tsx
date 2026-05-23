@@ -6,6 +6,8 @@ import {
   copyTranscript,
   repasteTranscript,
   deleteTranscript,
+  updateTranscript,
+  addDictionaryEntry,
   type Transcript,
 } from "@/lib/tauri";
 import { AppIcon } from "@/features/history/AppIcon";
@@ -19,6 +21,7 @@ export function TranscriptCard({ transcript, onChanged }: Props) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(transcript.text);
+  const [highlight, setHighlight] = useState<string[]>([]);
 
   async function handleCopy(e: React.MouseEvent) {
     e.stopPropagation();
@@ -51,10 +54,33 @@ export function TranscriptCard({ transcript, onChanged }: Props) {
     setEditing(false);
   }
 
-  function saveEdit(e: React.MouseEvent) {
+  async function saveEdit(e: React.MouseEvent) {
     e.stopPropagation();
-    // TODO wire updateTranscript backend command when it lands
+    const next = draft.trim();
     setEditing(false);
+    if (next === transcript.text) return;
+    try {
+      const corrections = await updateTranscript(transcript.id, next);
+      // flash the corrected words so the edit reads as saved and learned
+      setHighlight(corrections.map((c) => c.corrected));
+      setTimeout(() => setHighlight([]), 1800);
+      for (const c of corrections) {
+        toast("Learned a correction", {
+          description: `${c.original} becomes ${c.corrected}`,
+          action: {
+            label: "Add to dictionary",
+            onClick: () => {
+              void addDictionaryEntry(c.original, c.corrected).then(() =>
+                toast.success(`Added ${c.corrected} to dictionary`),
+              );
+            },
+          },
+        });
+      }
+      onChanged?.();
+    } catch (err) {
+      toast.error(`Save failed: ${(err as Error).message}`);
+    }
   }
 
   return (
@@ -88,7 +114,7 @@ export function TranscriptCard({ transcript, onChanged }: Props) {
 
       <div className="flex items-center gap-2 px-3.5 py-3">
         <p className={cn("flex-1 text-[13.5px] leading-[1.55]", !open && "line-clamp-2")}>
-          {transcript.text}
+          <HighlightedText text={transcript.text} words={highlight} />
         </p>
         <ChevronRight
           className={cn(
@@ -148,6 +174,31 @@ export function TranscriptCard({ transcript, onChanged }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function HighlightedText({ text, words }: { text: string; words: string[] }) {
+  if (words.length === 0) return <>{text}</>;
+  const escaped = words
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .filter(Boolean);
+  if (escaped.length === 0) return <>{text}</>;
+  const re = new RegExp(`(${escaped.join("|")})`, "g");
+  return (
+    <>
+      {text.split(re).map((part, i) =>
+        words.includes(part) ? (
+          <span
+            key={i}
+            className="animate-[mumble-flash_1.6s_ease-out] rounded-[2px]"
+          >
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   );
 }
 

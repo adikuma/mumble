@@ -17,7 +17,11 @@ import {
   listInputDevices,
   modelStatus,
   updateSettings,
+  listDictionary,
+  addDictionaryEntry,
+  deleteDictionaryEntry,
   type DeviceInfo,
+  type DictEntry,
   type ModelStatus,
 } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
@@ -91,6 +95,9 @@ export function SettingsView() {
   const [capturing, setCapturing] = useState(false);
   const [editDictionary, setEditDictionary] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
+  const [dict, setDict] = useState<DictEntry[]>([]);
+  const [newPattern, setNewPattern] = useState("");
+  const [newReplacement, setNewReplacement] = useState("");
 
   const [modelId, setModelId] = useLocal("modelId");
   const [language, setLanguage] = useLocal("language");
@@ -107,6 +114,28 @@ export function SettingsView() {
       .then(setModel)
       .catch(() => setModel(null));
   }, []);
+
+  useEffect(() => {
+    if (!editDictionary || !isTauri()) return;
+    listDictionary()
+      .then(setDict)
+      .catch(() => setDict([]));
+  }, [editDictionary]);
+
+  async function addEntry() {
+    const p = newPattern.trim();
+    const r = newReplacement.trim();
+    if (!p || !r) return;
+    const entry = await addDictionaryEntry(p, r);
+    setDict((d) => [entry, ...d.filter((e) => e.id !== entry.id)]);
+    setNewPattern("");
+    setNewReplacement("");
+  }
+
+  async function removeEntry(id: number) {
+    await deleteDictionaryEntry(id);
+    setDict((d) => d.filter((e) => e.id !== id));
+  }
 
   async function update(patch: Record<string, unknown>) {
     if (!isTauri()) {
@@ -348,6 +377,57 @@ export function SettingsView() {
           <DialogHeader>
             <DialogTitle>Custom dictionary</DialogTitle>
           </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-end gap-2">
+              <label className="flex flex-1 flex-col gap-1 text-xs">
+                <span className="text-muted-foreground">Heard as</span>
+                <input
+                  value={newPattern}
+                  onChange={(e) => setNewPattern(e.target.value)}
+                  placeholder="klema"
+                  className="border-input bg-background focus:border-foreground h-8 rounded-md border px-2 text-sm outline-none"
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1 text-xs">
+                <span className="text-muted-foreground">Replace with</span>
+                <input
+                  value={newReplacement}
+                  onChange={(e) => setNewReplacement(e.target.value)}
+                  placeholder="Kléma"
+                  className="border-input bg-background focus:border-foreground h-8 rounded-md border px-2 text-sm outline-none"
+                />
+              </label>
+              <Button size="sm" onClick={addEntry}>
+                Add
+              </Button>
+            </div>
+            <div className="max-h-[280px] overflow-y-auto">
+              {dict.length === 0 ? (
+                <p className="text-muted-foreground py-6 text-center text-xs">
+                  No entries yet. Edit a transcript and Mumble will suggest some.
+                </p>
+              ) : (
+                dict.map((e) => (
+                  <div
+                    key={e.id}
+                    className="border-border flex items-center justify-between gap-2 py-2 text-sm [&+&]:border-t"
+                  >
+                    <span className="truncate">
+                      <span className="text-muted-foreground">{e.pattern}</span>
+                      {" becomes "}
+                      <span className="font-medium">{e.replacement}</span>
+                    </span>
+                    <button
+                      onClick={() => removeEntry(e.id)}
+                      className="text-muted-foreground text-xs hover:text-red-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditDictionary(false)}>
               Close
