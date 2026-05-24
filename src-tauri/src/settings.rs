@@ -8,9 +8,11 @@ use crate::paths;
 /// user facing settings persisted to `%APPDATA%\Mumble\settings.json`.
 ///
 /// the default hotkey is `RightAlt` (every laptop has it. no right ctrl on
-/// 14 inch keyboards). pre roll defaults to 450 ms (hex's value, the one
-/// reason it never clips first syllables. see `SuperFastCaptureController`
-/// in the cloned hex source). auto paste defaults to ON. the only way to
+/// 14 inch keyboards). pre roll defaults to 0 ms (zero buffer). capture is
+/// always live so recording starts the instant the key goes down, and the
+/// indicator shows a speak now cue, so the look back buffer stays off by
+/// default. raise it in settings if you tend to talk before the cue. auto
+/// paste defaults to ON. the only way to
 /// flip it is from the in app settings, behavior toggle.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +25,7 @@ pub struct Settings {
     pub paused: bool,
 
     /// milliseconds of audio prepended on hotkey press (the warm ring buffer
-    /// look back window). 0 disables pre roll. hex uses 450.
+    /// look back window). 0 disables pre roll and is the default.
     #[serde(default = "default_preroll_ms")]
     pub pre_roll_ms: u32,
 
@@ -35,7 +37,7 @@ pub struct Settings {
 }
 
 fn default_preroll_ms() -> u32 {
-    450
+    0
 }
 fn default_auto_paste() -> bool {
     true

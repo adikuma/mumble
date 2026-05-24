@@ -4,6 +4,22 @@ Continual log of bug fixes, design decisions, and learnings. Newest entries on t
 
 ---
 
+## 2026-05-24: main - voice capture quality (gain normalization, speak now cue, zero default pre roll)
+
+### Problem
+- Transcription was flaky on quiet speech and the first word often dropped. There was no gain control anywhere in the pipeline. Raw samples went straight to the 80 dim log mel features (`transcribe.rs`), so low volume input reached the model weak and sometimes came back empty.
+- The recording pill only showed a running timer, not a clear cue for when to start talking. The 450 ms pre roll was meant to cover the gap, but quiet first words were still lost (a model sensitivity issue, not clipped audio).
+
+### Fix
+- `audio.rs`: added `normalize_peak`, a peak normalization pass in `stop_recording`. It boosts quiet recordings toward a 0.95 peak, only boosts (never attenuates, so healthy recordings are untouched), skips near silence (peak below 0.01) so it does not amplify background noise, and caps gain at 12x so a faint clip is not blown up. Applied after resample, before transcription.
+- `settings.rs`: `default_preroll_ms` is now 0 (zero buffer). Capture is always live so recording starts the instant the key goes down.
+- `MicIndicator.tsx`: added `useSpeechDetected`, which polls the rms meter and flips once your voice crosses 0.02. The pill shows a "Speak now" cue until then, then reveals the live waveform and timer.
+
+### Learnings
+- There is no VAD or loudness gate in the pipeline. The only short circuit is `MIN_RECORDING_SEC` (0.30) in `pipeline.rs`, a wall clock hold floor for fat finger taps. The flakiness was gain plus the empty result path, not a threshold rejecting quiet input.
+- The model is int8 quantized (`model_download.rs` pulls the int8 onnx assets). int8 plus low SNR compounds the quiet speech problem, which is why normalization helps. An int8 vs fp32 benchmark is the next step.
+- `normalize_peak` only changes the audio sent to the model. The live rms meter is computed on raw stream samples in `process_samples`, so the "Speak now" threshold reflects true input, not normalized audio.
+
 ## 2026-05-21: feature/mumble-backend - UI redesign (top-tab shell, soft-lift depth, app icons)
 
 ### Decisions

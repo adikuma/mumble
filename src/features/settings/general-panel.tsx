@@ -39,7 +39,7 @@ export function GeneralPanel() {
   const hotkey = formatHotkey(settings?.hotkey ?? "Right Alt");
   const autoPaste = settings?.autoPaste ?? true;
   const launchAtLogin = settings?.launchAtLogin ?? false;
-  const preRoll = String(settings?.preRollMs ?? 450);
+  const preRoll = String(settings?.preRollMs ?? 0);
 
   return (
     <>

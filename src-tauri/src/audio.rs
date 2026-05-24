@@ -208,7 +208,10 @@ impl CaptureEngine {
             std::mem::take(&mut *buf)
         };
         let mono = downmix_mono(&raw, self.source_channels);
-        let resampled = resample_linear(&mono, self.source_rate, TARGET_SAMPLE_RATE);
+        let mut resampled = resample_linear(&mono, self.source_rate, TARGET_SAMPLE_RATE);
+        // lift quiet speech to a healthy level so low volume input is not
+        // transcribed as empty or garbled. see normalize_peak.
+        normalize_peak(&mut resampled);
         let duration = resampled.len() as f64 / TARGET_SAMPLE_RATE as f64;
         (resampled, duration)
     }
@@ -271,6 +274,28 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
         out.push(a + (b - a) * frac);
     }
     out
+}
+
+// peak normalization applied before transcription. we only boost, never
+// attenuate, so healthy recordings are left untouched. near silence is skipped
+// so we do not amplify background noise, and the gain is capped so a very faint
+// signal is not blown up into loud noise.
+const NORMALIZE_TARGET_PEAK: f32 = 0.95;
+const NORMALIZE_NOISE_FLOOR: f32 = 0.01;
+const NORMALIZE_MAX_GAIN: f32 = 12.0;
+
+fn normalize_peak(samples: &mut [f32]) {
+    let peak = samples.iter().fold(0.0f32, |m, &s| m.max(s.abs()));
+    if peak < NORMALIZE_NOISE_FLOOR {
+        return;
+    }
+    let gain = (NORMALIZE_TARGET_PEAK / peak).min(NORMALIZE_MAX_GAIN);
+    if gain <= 1.0 {
+        return;
+    }
+    for s in samples.iter_mut() {
+        *s = (*s * gain).clamp(-1.0, 1.0);
+    }
 }
 
 // chunking constants for the transcribe path.
