@@ -45,6 +45,19 @@ export function ThemeProvider({
     return () => systemMediaQuery.removeEventListener("change", handler);
   }, []);
 
+  // keep theme in sync across windows. the indicator pill lives in its own
+  // tauri webview, so when the main window flips the theme we hear the shared
+  // localstorage change here and update too.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === storageKey && e.newValue) {
+        setTheme(e.newValue as Theme);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [storageKey]);
+
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");

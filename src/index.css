@@ -56,6 +56,124 @@
   --text-sm: 13px;
   --text-base: 15px;
   --text-lg: 18px;
+
+  /* accordion expand and collapse, driven by radix content height. */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/* rendered markdown in the scratchpad. minimal, clean, readable. */
+.md {
+  font-size: 14px;
+  line-height: 1.7;
+  color: hsl(var(--foreground));
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.4em 0 0.5em;
+}
+.md h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 1.3em 0 0.4em;
+}
+.md h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 1.2em 0 0.4em;
+}
+.md p {
+  margin: 0.7em 0;
+}
+.md ul,
+.md ol {
+  margin: 0.7em 0;
+  padding-left: 1.4em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.2em 0;
+}
+.md a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.88em;
+  background: hsl(var(--muted));
+  padding: 0.12em 0.36em;
+  border-radius: 5px;
+}
+.md pre {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.9em 0;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+}
+.md blockquote {
+  border-left: 3px solid hsl(var(--border-strong));
+  padding-left: 14px;
+  margin: 0.9em 0;
+  color: hsl(var(--muted-foreground));
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.3em 0;
+}
+.md strong {
+  font-weight: 600;
+}
+.md table {
+  border-collapse: collapse;
+  margin: 0.9em 0;
+  font-size: 13px;
+}
+.md th,
+.md td {
+  border: 1px solid hsl(var(--border));
+  padding: 6px 10px;
+  text-align: left;
+}
+.md img {
+  max-width: 100%;
+  border-radius: 8px;
 }
 
 /* all color tokens are bare hsl triplets. the @theme inline block above wraps
@@ -96,7 +214,7 @@
   --input: 240 5.9% 90%;
   --ring: 240 5.9% 10%;
 
-  --sidebar: 48 33% 97%;
+  --sidebar: 40 14% 95.5%;
   --sidebar-foreground: 240 5.3% 26.1%;
   --sidebar-border: 40 15% 90%;
   --sidebar-accent: 45 25% 92%;
@@ -104,14 +222,15 @@
   --sidebar-ring: 240 5.9% 10%;
 }
 
-/* dark mode. lifted near black content area, sidebar pushed darker as
- * the deeper plane (linear, discord, vs code convention). */
+/* dark mode uses shadcn default neutrals (near black zinc) for the base, with
+ * cards and popovers lifted above the background so surfaces separate the way
+ * they do in light mode. the indigo primary carries over as the brand accent. */
 .dark {
-  --background: 240 6% 10%;
-  --foreground: 0 0% 95%;
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
 
-  --card: 240 5% 14.5%;
-  --card-foreground: 0 0% 95%;
+  --card: 240 6% 9%;
+  --card-foreground: 0 0% 98%;
 
   --popover: 240 6% 9%;
   --popover-foreground: 0 0% 98%;
@@ -119,28 +238,28 @@
   --primary: 248 70% 72%;
   --primary-foreground: 240 6% 10%;
 
-  --secondary: 240 4% 15%;
+  --secondary: 240 3.7% 15.9%;
   --secondary-foreground: 0 0% 98%;
 
-  --muted: 240 5% 18%;
-  --muted-foreground: 240 5% 60%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
 
-  --accent: 240 5% 19%;
-  --accent-foreground: 0 0% 96%;
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 4% 19%;
-  --border-strong: 240 4% 24%;
-  --input: 240 4% 18%;
+  --border: 240 3.7% 15.9%;
+  --border-strong: 240 3.7% 22%;
+  --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
 
-  --sidebar: 240 6% 9%;
-  --sidebar-foreground: 240 5% 88%;
-  --sidebar-border: 240 6% 9%;
-  --sidebar-accent: 240 6% 11%;
-  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar: 240 10% 3.9%;
+  --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-accent: 240 3.7% 15.9%;
+  --sidebar-accent-foreground: 240 4.8% 95.9%;
   --sidebar-ring: 240 4.9% 83.9%;
 }
 
@@ -233,6 +352,30 @@ body.indicator-window #root {
       0 10px 24px hsl(0 0% 0% / 0.3);
   }
 
+  /* subtle beveled edge for raised surfaces. a hairline light rim catches the
+   * light around the edges, brightest along the top, the way native dark
+   * toolbars and pills do. only the edge is touched, never the face. it reads
+   * strongest in dark mode. */
+  .surface-3d {
+    position: relative;
+  }
+  .surface-3d::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.7),
+      inset 0 -1px 0 hsl(40 10% 35% / 0.05),
+      inset 0 0 0 1px hsl(0 0% 100% / 0.02);
+  }
+  .dark .surface-3d::after {
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.12),
+      inset 0 0 0 1px hsl(0 0% 100% / 0.07);
+  }
+
   @keyframes mumble-flash {
     0% {
       background-color: hsl(248 53% 58% / 0.35);
@@ -241,4 +384,5 @@ body.indicator-window #root {
       background-color: hsl(248 53% 58% / 0);
     }
   }
+
 }
