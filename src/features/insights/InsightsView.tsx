@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Flame } from "lucide-react";
 import {
   getInsights,
@@ -7,15 +7,19 @@ import {
   type InsightsData,
 } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
+import { StatCard } from "@/components/kit/stat-card";
+import { BarList } from "@/components/kit/bar-list";
+import { WpmGauge } from "@/components/kit/wpm-gauge";
+import { AppIconGrid } from "@/components/kit/app-icon-grid";
+import { avgWpmThisWeek } from "@/features/home/home-helpers";
+import { topPastedApps } from "@/features/insights/insights-helpers";
 
-// how many days the contribution heatmap spans. a full year so the grid
-// fills the card width like github's contribution graph.
+// a full year so the contribution heatmap fills the card like github's.
 const HEATMAP_DAYS = 364;
 
 function formatMinutes(sec: number): string {
   if (sec < 60) return `${Math.round(sec)} sec`;
-  const mins = Math.floor(sec / 60);
-  return `${mins} min`;
+  return `${Math.floor(sec / 60)} min`;
 }
 
 function formatHoursMinutes(sec: number): string {
@@ -25,10 +29,6 @@ function formatHoursMinutes(sec: number): string {
   const mins = totalMins % 60;
   if (hours === 0) return `0:${mins.toString().padStart(2, "0")}`;
   return `${hours}:${mins.toString().padStart(2, "0")}`;
-}
-
-function emDash(): string {
-  return "—";
 }
 
 export function InsightsView() {
@@ -44,70 +44,63 @@ export function InsightsView() {
     getInsights(HEATMAP_DAYS)
       .then((d) => setHeat(d.dailyActivity))
       .catch(() => setHeat([]));
-    // refetch when transcripts change so new dictations show up live
   }, [transcripts.length]);
 
   const empty = !data || data.sessions === 0;
+  const wpm = useMemo(() => avgWpmThisWeek(transcripts), [transcripts]);
+  const apps = useMemo(() => topPastedApps(transcripts), [transcripts]);
+  const dash = "—";
 
   return (
-    <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
-      <div className="mx-auto w-full max-w-[880px] px-7 pt-6 pb-16">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-[22px] font-semibold tracking-[-0.015em]">
-              {empty
-                ? emDash()
-                : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week`}
-            </h1>
-            <p className="text-muted-foreground text-xs">
-              {empty
-                ? emDash()
-                : `Across ${data!.sessions} ${data!.sessions === 1 ? "transcript" : "transcripts"}.`}
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-[1000px] px-9 py-9">
+      <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Insights</h1>
+      <p className="text-muted-foreground mt-1.5 text-sm">
+        {empty
+          ? "Your dictation stats will appear here."
+          : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week, across ${data!.sessions} ${data!.sessions === 1 ? "dictation" : "dictations"}.`}
+      </p>
 
-          <div className="grid grid-cols-4 gap-3">
-            <Stat
-              label="Words"
-              value={empty ? emDash() : data!.words.toLocaleString()}
-            />
-            <Stat
-              label="Sessions"
-              value={empty ? emDash() : data!.sessions.toLocaleString()}
-            />
-            <Stat
-              label="Avg latency"
-              value={
-                empty || data!.avgLatencyMs === null
-                  ? emDash()
-                  : `${data!.avgLatencyMs}`
-              }
-              unit={!empty && data!.avgLatencyMs !== null ? "ms" : undefined}
-            />
-            <Stat
-              label="Time saved"
-              value={empty ? emDash() : formatHoursMinutes(data!.timeSavedSec)}
-              unit={!empty ? "hr" : undefined}
-            />
-          </div>
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard
+          label="Words / min"
+          value={empty || wpm == null ? dash : String(wpm)}
+        >
+          <WpmGauge wpm={empty ? null : wpm} />
+        </StatCard>
+        <StatCard
+          label="Time saved"
+          value={empty ? dash : formatHoursMinutes(data!.timeSavedSec)}
+          unit={empty ? undefined : "hr"}
+        />
+        <StatCard
+          label="Total words"
+          value={empty ? dash : data!.words.toLocaleString()}
+        />
+      </div>
 
-          <Heatmap days={heat} />
+      <Heatmap days={heat} />
 
-          <div className="grid grid-cols-[1.4fr_1fr] gap-3">
-            <ListCard
-              title="Where you pasted"
-              entries={empty ? [] : data!.topApps}
-            />
-            <ListCard title="Top words" entries={empty ? [] : data!.topWords} />
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="bg-accent rounded-2xl p-5">
+          <div className="mb-3 text-base font-semibold">Top words</div>
+          <BarList entries={empty ? [] : data!.topWords} />
+        </div>
+        <div className="bg-accent rounded-2xl p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-base font-semibold">Where you pasted</span>
+            {apps.length > 0 ? (
+              <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.07em] uppercase">
+                {apps.length} apps
+              </span>
+            ) : null}
           </div>
+          <AppIconGrid apps={apps} />
         </div>
       </div>
     </div>
   );
 }
 
-// 0 is the empty (no activity) shade, 1 to 4 ramp the indigo intensity by
-// how busy the day was relative to the busiest day in range.
 function shadeColor(level: number): string {
   switch (level) {
     case 1:
@@ -119,15 +112,13 @@ function shadeColor(level: number): string {
     case 4:
       return "hsl(248 53% 58%)";
     default:
-      return "hsl(var(--muted))";
+      return "hsl(var(--muted-foreground) / 0.16)";
   }
 }
 
 function Heatmap({ days }: { days: DailyBucket[] }) {
   const max = Math.max(1, ...days.map((d) => d.count));
 
-  // current streak. consecutive days with at least one dictation counting
-  // back from the most recent day.
   let streak = 0;
   for (let i = days.length - 1; i >= 0; i -= 1) {
     if (days[i].count > 0) streak += 1;
@@ -143,8 +134,6 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
     return 1;
   };
 
-  // pad the front so the first day lands on its weekday row (sunday first),
-  // then split into week columns for a github style grid.
   const cells: (DailyBucket | null)[] = [];
   if (days.length > 0) {
     const firstDow = new Date(days[0].day + "T00:00:00").getDay();
@@ -158,11 +147,11 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
   const dowLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
 
   return (
-    <div className="bg-card border-border rounded-lg border p-[18px]">
+    <div className="bg-accent mt-4 rounded-2xl p-5">
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm font-semibold">Activity</div>
+        <div className="text-base font-semibold">Activity</div>
         {streak > 0 ? (
-          <span className="text-primary flex items-center gap-1.5 rounded-full bg-[hsl(248_53%_58%/0.12)] px-2.5 py-1 text-xs font-medium">
+          <span className="text-primary flex items-center gap-1.5 rounded-full bg-[hsl(248_53%_58%/0.14)] px-2.5 py-1 text-xs font-medium">
             <Flame className="size-3.5" strokeWidth={2.25} />
             {streak} day{streak === 1 ? "" : "s"} streak
           </span>
@@ -208,58 +197,6 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
         ))}
         More
       </div>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-}) {
-  return (
-    <div className="bg-card border-border flex flex-col rounded-lg border p-[14px]">
-      <span className="text-muted-foreground text-xs font-medium tracking-[0.06em] uppercase">
-        {label}
-      </span>
-      <span className="mt-1 text-2xl font-semibold tracking-[-0.01em] tabular-nums">
-        {value}
-        {unit ? (
-          <span className="text-muted-foreground ml-1 text-sm font-normal">
-            {unit}
-          </span>
-        ) : null}
-      </span>
-      <span className="text-muted-foreground mt-0.5 text-xs">&nbsp;</span>
-    </div>
-  );
-}
-
-function ListCard({
-  title,
-  entries,
-}: {
-  title: string;
-  entries: { label: string; count: number }[];
-}) {
-  return (
-    <div className="bg-card border-border rounded-lg border py-1">
-      <div className="px-4 pt-3 pb-1.5 text-sm font-semibold">{title}</div>
-      {entries.map((e, i) => (
-        <div
-          key={`${e.label}-${i}`}
-          className="border-border flex items-center justify-between px-4 py-2 text-sm [&+&]:border-t"
-        >
-          <span className="truncate">{e.label}</span>
-          <span className="text-muted-foreground text-xs tabular-nums">
-            {e.count}
-          </span>
-        </div>
-      ))}
     </div>
   );
 }
