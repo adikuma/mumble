@@ -45,10 +45,12 @@ pub fn paste_chunk(text: &str, leading_space: bool) -> Result<()> {
     };
     cb.set_text(payload)
         .context("write chunk to clipboard")?;
+    tracing::info!("paste: clipboard staged"); // TODO cleanup
     // give windows a beat to actually stage the new clipboard contents before
     // we fire the keystroke.
     thread::sleep(Duration::from_millis(40));
     synth_ctrl_v().context("synth Ctrl+V")?;
+    tracing::info!("paste: ctrl+v dispatched"); // TODO cleanup
     // wait for the target app to read the clipboard. shorter than the one
     // shot path because the next chunk (or the restore) is right behind us.
     thread::sleep(Duration::from_millis(80));

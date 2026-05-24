@@ -205,6 +205,9 @@ impl Pipeline {
                 None
             };
 
+            // diagnostic. confirm which app we captured as the paste target.
+            tracing::info!(?captured_app, "paste: captured foreground target"); // TODO cleanup
+
             shared_state.set(AppState::Pasting);
             emit_state(&app, AppState::Pasting);
 
@@ -256,6 +259,15 @@ impl Pipeline {
                 accumulated.push_str(&text);
 
                 if settings.auto_paste {
+                    // diagnostic. is the captured target still the foreground
+                    // window when we fire Ctrl+V, or did focus move to mumble?
+                    let fg_now = target_app::current_foreground_app().map(|(n, _)| n);
+                    tracing::info!(
+                        ?fg_now,
+                        ?captured_app,
+                        chunk = idx,
+                        "paste: foreground before Ctrl+V"
+                    ); // TODO cleanup
                     if let Err(e) = paste::paste_chunk(&text, leading_space) {
                         tracing::error!(?e, "paste_chunk failed");
                         emit_error(&app, e.to_string());
