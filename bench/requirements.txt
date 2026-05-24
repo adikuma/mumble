@@ -1,0 +1,12 @@
+# asr benchmark, pinned and supply chain vetted (verified 2026-05-24).
+# all versions are mature releases, not last few days uploads, and every
+# maintainer was confirmed against the known legitimate owner. install
+# prebuilt wheels only so no native code is compiled locally:
+#   pip install --only-binary=:all: -r requirements.txt
+sherpa-onnx==1.13.0
+datasets==4.8.5
+jiwer==4.0.0
+whisper-normalizer==0.1.12
+soundfile==0.13.1
+numpy==2.4.3
+psutil==7.1.0

@@ -4,6 +4,20 @@ Continual log of bug fixes, design decisions, and learnings. Newest entries on t
 
 ---
 
+## 2026-05-24: main - asr benchmark (int8 vs fp32 parakeet)
+
+### What
+Benchmarked the Parakeet-TDT-0.6B-v3 model on a 150 utterance subset of LibriSpeech test-clean, comparing the int8 build we ship against fp32. Harness lives in `bench/` and uses the `sherpa-onnx` python package (same c++ core as the rust `sherpa-rs` crate, so accuracy matches the app). Full report in `BENCHMARK.md`.
+
+### Results
+- int8: WER 1.69%, CER 0.64%, RTF 0.036 (27x realtime), model RAM 723 MB, peak 2.17 GB.
+- fp32: WER 1.44%, CER 0.47%, RTF 0.08 (12.5x realtime), model RAM 2.29 GB, peak 3.88 GB.
+- Published NVIDIA reference is 1.93% on full test-clean, so the setup is correct (the subset runs a touch lower).
+
+### Learnings
+- int8 costs about 0.25 points of absolute WER versus fp32 (1.69 vs 1.44) but is 2.2x faster and uses about a third of the model memory. int8 is the right default for a realtime dictation app; fp32 is the max quality option for users with RAM to spare. This is the data behind the planned settings option (let users pick int8 vs fp32, showing memory and quality).
+- Supply chain: all python deps are pinned to vetted mature versions in `bench/requirements.txt`, installed as wheels only with no source builds. Models and dataset come from the legitimate `csukuangfj` / k2-fsa HuggingFace repos. The dataset loads from the parquet convert branch with audio decoding disabled (soundfile reads the flac bytes), so no remote loader script runs and no torch dependency is pulled.
+
 ## 2026-05-24: main - voice capture quality (gain normalization, speak now cue, zero default pre roll)
 
 ### Problem
