@@ -179,6 +179,9 @@ pub fn run() {
             commands::update_dictionary_entry,
             commands::delete_dictionary_entry,
             commands::update_transcript,
+            commands::list_notes,
+            commands::save_note,
+            commands::delete_note,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

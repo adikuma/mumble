@@ -63,6 +63,16 @@ pub struct TopEntry {
     pub count: u64,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Note {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Clone)]
 pub struct HistoryStore {
     conn: Arc<Mutex<Connection>>,
@@ -108,6 +118,15 @@ impl HistoryStore {
                 hits INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS notes (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT '',
+                body TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_notes_updated_at
+                ON notes(updated_at DESC);
             "#,
         )?;
         migrate(&conn)?;
@@ -291,6 +310,46 @@ impl HistoryStore {
         Ok(())
     }
 
+    pub fn list_notes(&self) -> Result<Vec<Note>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, title, body, created_at, updated_at
+             FROM notes ORDER BY updated_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| row_to_note(row))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .context("collect notes")
+    }
+
+    // upsert by id. the frontend generates the id for new notes, so a save is
+    // an insert on first write and an update after. created_at is preserved on
+    // update, updated_at always bumps to now.
+    pub fn save_note(&self, id: &str, title: &str, body: &str) -> Result<Note> {
+        let conn = self.conn.lock();
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO notes (id, title, body, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                body = excluded.body,
+                updated_at = excluded.updated_at",
+            params![id, title, body, now],
+        )?;
+        let note = conn.query_row(
+            "SELECT id, title, body, created_at, updated_at FROM notes WHERE id = ?1",
+            params![id],
+            row_to_note,
+        )?;
+        Ok(note)
+    }
+
+    pub fn delete_note(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
     /// aggregate metrics for the last `range_days` days. computed in rust
     /// (rather than sql) because we tokenize transcript text for word stats.
     pub fn insights(&self, range_days: u32) -> Result<InsightsData> {
@@ -417,6 +476,16 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         latency_ms: row.get(6)?,
         target_app: row.get(7)?,
         target_app_path: row.get(8)?,
+    })
+}
+
+fn row_to_note(row: &rusqlite::Row<'_>) -> rusqlite::Result<Note> {
+    Ok(Note {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        body: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
     })
 }
 

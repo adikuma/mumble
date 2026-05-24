@@ -7,7 +7,7 @@ use tauri_plugin_autostart::ManagerExt;
 
 use crate::audio;
 use crate::dictionary::{Correction, DictEntry};
-use crate::history::{HistoryStore, InsightsData, Transcript};
+use crate::history::{HistoryStore, InsightsData, Note, Transcript};
 use crate::hotkey::HotkeyListener;
 use crate::model_download;
 use crate::paste;
@@ -210,6 +210,26 @@ pub fn get_app_icon(
     exe_path: String,
 ) -> Option<String> {
     pipeline.state.icon_cache.get_or_extract(&exe_path)
+}
+
+#[tauri::command]
+pub fn list_notes(history: State<'_, HistoryStore>) -> Result<Vec<Note>, String> {
+    history.list_notes().map_err(err)
+}
+
+#[tauri::command]
+pub fn save_note(
+    history: State<'_, HistoryStore>,
+    id: String,
+    title: String,
+    body: String,
+) -> Result<Note, String> {
+    history.save_note(&id, &title, &body).map_err(err)
+}
+
+#[tauri::command]
+pub fn delete_note(history: State<'_, HistoryStore>, id: String) -> Result<(), String> {
+    history.delete_note(&id).map_err(err)
 }
 
 #[derive(Serialize)]
