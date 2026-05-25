@@ -240,15 +240,30 @@ body.indicator-window #root {
 .panel-bg {
   background-color: hsl(var(--background));
   background-image:
-    linear-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px);
-  background-size: 22px 22px;
+    linear-gradient(hsl(var(--foreground) / 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.026) 1px, transparent 1px);
+  background-position: -8px -8px;
+  background-size: 26px 26px;
+  mask-image: radial-gradient(
+    ellipse at 54% 43%,
+    transparent 0%,
+    transparent 64%,
+    rgb(0 0 0 / 0.14) 77%,
+    black 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse at 54% 43%,
+    transparent 0%,
+    transparent 64%,
+    rgb(0 0 0 / 0.14) 77%,
+    black 100%
+  );
 }
 .dark .panel-bg {
   background-color: hsl(var(--background));
   background-image:
-    linear-gradient(hsl(var(--foreground) / 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--foreground) / 0.045) 1px, transparent 1px);
+    linear-gradient(hsl(var(--foreground) / 0.033) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.033) 1px, transparent 1px);
 }
 
 @layer utilities {

@@ -14,7 +14,7 @@ Keep:
 - flat surfaces instead of glass, bevels, or heavy shadows
 - amber accent in light mode
 - purple accent in dark mode
-- subtle checked line pattern inside the main panel only
+- subtle checked line pattern around the main panel edges only
 - visible borders for structure
 - consistent page widths and grid gaps
 
@@ -214,6 +214,7 @@ The main panel may use a subtle token-driven checked line pattern through `.pane
 Rules:
 
 - pattern lives only inside the main canvas
+- pattern fades out toward the working content area
 - content surfaces stay readable over it
 - light mode remains clean and low contrast
 - dark mode remains minimal and not noisy
