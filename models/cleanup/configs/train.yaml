@@ -1,0 +1,35 @@
+# default hyperparameters for the lora fine tune.
+base_model: Qwen/Qwen2.5-0.5B-Instruct
+max_seq_length: 1024
+
+# lora
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+# optimizer
+learning_rate: 2.0e-4
+weight_decay: 0.0
+warmup_ratio: 0.03
+max_grad_norm: 1.0
+lr_scheduler_type: cosine
+
+# training loop
+num_epochs: 3
+train_batch_size: 8
+eval_batch_size: 16
+gradient_accumulation_steps: 2
+max_train_rows: null
+max_eval_rows: null
+
+# precision (auto downgraded on cpu, see 02_train)
+bf16: true
+fp16: false
+tf32: true
+
+# misc
+seed: 42
+logging_steps: 25
+save_total_limit: 2
+completion_only: true   # train only on the clean target, mask the prompt

@@ -15,7 +15,7 @@ export function AppIconGrid({ apps }: { apps: AppEntry[] }) {
       {apps.map((a) => (
         <div key={a.name} className="flex w-20 flex-col items-center gap-2">
           <div className="relative">
-            <div className="bg-card flex size-12 items-center justify-center overflow-hidden rounded-[13px] shadow-lift">
+            <div className="bg-card shadow-lift flex size-12 items-center justify-center overflow-hidden rounded-[11px]">
               <AppIcon exePath={a.path} appName={a.name} size={28} />
             </div>
             <span className="bg-primary text-primary-foreground border-accent absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 px-1 text-[11px] font-bold tabular-nums">

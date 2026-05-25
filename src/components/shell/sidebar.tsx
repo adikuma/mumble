@@ -1,9 +1,9 @@
 import type { ComponentType } from "react";
-import { Home, BarChart3, BookText, StickyNote, Settings } from "lucide-react";
+import { Home, BarChart3, BookText, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
-export type Page = "home" | "insights" | "dictionary" | "scratchpad";
+export type Page = "home" | "insights" | "dictionary" | "settings";
 
 type IconType = ComponentType<{ className?: string; strokeWidth?: number }>;
 
@@ -11,13 +11,11 @@ const NAV: { id: Page; label: string; Icon: IconType }[] = [
   { id: "home", label: "Home", Icon: Home },
   { id: "insights", label: "Insights", Icon: BarChart3 },
   { id: "dictionary", label: "Dictionary", Icon: BookText },
-  { id: "scratchpad", label: "Scratchpad", Icon: StickyNote },
 ];
 
 interface SidebarProps {
   page: Page;
   onNavigate: (p: Page) => void;
-  onOpenSettings: () => void;
   collapsed: boolean;
   bottomBar: boolean;
 }
@@ -25,7 +23,6 @@ interface SidebarProps {
 export function Sidebar({
   page,
   onNavigate,
-  onOpenSettings,
   collapsed,
   bottomBar,
 }: SidebarProps) {
@@ -43,8 +40,8 @@ export function Sidebar({
           />
         ))}
         <NavButton
-          active={false}
-          onClick={onOpenSettings}
+          active={page === "settings"}
+          onClick={() => onNavigate("settings")}
           collapsed
           Icon={Settings}
           label="Settings"
@@ -82,8 +79,8 @@ export function Sidebar({
       </nav>
       <div className="flex-1" />
       <NavButton
-        active={false}
-        onClick={onOpenSettings}
+        active={page === "settings"}
+        onClick={() => onNavigate("settings")}
         collapsed={collapsed}
         Icon={Settings}
         label="Settings"
@@ -111,7 +108,7 @@ function NavButton({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-[10px] px-2.5 py-2.5 text-sm font-medium transition-colors",
+        "flex items-center gap-3 rounded-[8px] px-2.5 py-2.5 text-sm font-medium transition-colors",
         collapsed && "justify-center",
         active
           ? "bg-card text-foreground shadow-lift surface-3d font-semibold"

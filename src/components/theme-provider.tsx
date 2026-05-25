@@ -68,7 +68,8 @@ export function ThemeProvider({
     root.classList.add(theme);
   }, [theme, systemTheme]);
 
-  const resolvedTheme: "light" | "dark" = theme === "system" ? systemTheme : theme;
+  const resolvedTheme: "light" | "dark" =
+    theme === "system" ? systemTheme : theme;
 
   return (
     <ThemeProviderContext.Provider

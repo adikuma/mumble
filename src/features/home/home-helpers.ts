@@ -12,11 +12,16 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function wordsToday(transcripts: Transcript[], now: Date = new Date()): number {
+export function wordsToday(
+  transcripts: Transcript[],
+  now: Date = new Date(),
+): number {
   const today = startOfDay(now);
   return transcripts.reduce(
     (sum, t) =>
-      startOfDay(new Date(t.createdAt)) === today ? sum + wordCount(t.text) : sum,
+      startOfDay(new Date(t.createdAt)) === today
+        ? sum + wordCount(t.text)
+        : sum,
     0,
   );
 }
@@ -25,7 +30,9 @@ export function currentStreakDays(
   transcripts: Transcript[],
   now: Date = new Date(),
 ): number {
-  const days = new Set(transcripts.map((t) => startOfDay(new Date(t.createdAt))));
+  const days = new Set(
+    transcripts.map((t) => startOfDay(new Date(t.createdAt))),
+  );
   let cursor = startOfDay(now);
   // if there is nothing today yet, count the streak from yesterday so a day
   // still in progress does not read as a broken streak.

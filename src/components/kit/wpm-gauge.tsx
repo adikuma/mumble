@@ -13,7 +13,13 @@ export function WpmGauge({ wpm }: WpmGaugeProps) {
   const ex = cx + r * Math.cos(angle);
   const ey = cy - r * Math.sin(angle);
   return (
-    <svg viewBox="0 0 104 62" width="104" height="62" aria-hidden className="shrink-0">
+    <svg
+      viewBox="0 0 104 62"
+      width="104"
+      height="62"
+      aria-hidden
+      className="shrink-0"
+    >
       <path
         d="M8 54 A44 44 0 0 1 96 54"
         fill="none"

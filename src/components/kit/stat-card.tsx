@@ -9,11 +9,17 @@ interface StatCardProps {
   children?: ReactNode;
 }
 
-export function StatCard({ label, value, unit, className, children }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  unit,
+  className,
+  children,
+}: StatCardProps) {
   return (
     <div
       className={cn(
-        "bg-accent flex items-center justify-between rounded-2xl p-5",
+        "bg-card/68 surface-3d shadow-lift flex items-center justify-between rounded-[13px] p-5 backdrop-blur-md",
         className,
       )}
     >

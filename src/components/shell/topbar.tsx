@@ -1,12 +1,13 @@
 import { PanelLeft } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { WindowControls } from "@/components/shell/window-controls";
+import { cn } from "@/lib/utils";
 
 interface TopbarProps {
   onToggleSidebar: () => void;
+  canToggle: boolean;
 }
 
-export function Topbar({ onToggleSidebar }: TopbarProps) {
+export function Topbar({ onToggleSidebar, canToggle }: TopbarProps) {
   return (
     <div
       className="flex h-[46px] shrink-0 items-center justify-between pl-2"
@@ -14,17 +15,23 @@ export function Topbar({ onToggleSidebar }: TopbarProps) {
     >
       <button
         onClick={onToggleSidebar}
+        disabled={!canToggle}
         aria-label="Toggle sidebar"
-        className="text-muted-foreground hover:bg-accent hover:text-foreground flex size-8 items-center justify-center rounded-[9px] transition-colors"
+        aria-disabled={!canToggle}
+        className={cn(
+          "flex size-8 items-center justify-center rounded-[8px] transition-colors",
+          canToggle
+            ? "text-muted-foreground hover:bg-accent hover:text-foreground"
+            : "text-muted-foreground/40 cursor-default",
+        )}
         style={{ ["WebkitAppRegion" as never]: "no-drag" }}
       >
         <PanelLeft className="size-[18px]" strokeWidth={1.8} />
       </button>
       <div
-        className="flex h-full items-center gap-1"
+        className="flex h-full items-center"
         style={{ ["WebkitAppRegion" as never]: "no-drag" }}
       >
-        <ThemeToggle />
         <WindowControls />
       </div>
     </div>

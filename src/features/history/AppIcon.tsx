@@ -9,7 +9,9 @@ interface Props {
 }
 
 export function AppIcon({ exePath, appName, size = 14 }: Props) {
-  const icon = useMumbleStore((s) => (exePath ? s.appIcons[exePath] : undefined));
+  const icon = useMumbleStore((s) =>
+    exePath ? s.appIcons[exePath] : undefined,
+  );
   const setAppIcon = useMumbleStore((s) => s.setAppIcon);
 
   useEffect(() => {

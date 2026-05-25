@@ -52,13 +52,17 @@ export function InsightsView() {
   const dash = "—";
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-9 py-9">
-      <h1 className="text-[26px] font-semibold tracking-[-0.02em]">Insights</h1>
-      <p className="text-muted-foreground mt-1.5 text-sm">
-        {empty
-          ? "Your dictation stats will appear here."
-          : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week, across ${data!.sessions} ${data!.sessions === 1 ? "dictation" : "dictations"}.`}
-      </p>
+    <div className="mx-auto w-full max-w-[880px] px-9 pb-9">
+      <div className="sticky top-0 z-10 -mx-9 px-9 pt-9 pb-4">
+        <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
+          Insights
+        </h1>
+        <p className="text-muted-foreground mt-1.5 text-sm">
+          {empty
+            ? "Your dictation stats will appear here."
+            : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week, across ${data!.sessions} ${data!.sessions === 1 ? "dictation" : "dictations"}.`}
+        </p>
+      </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard
@@ -81,11 +85,11 @@ export function InsightsView() {
       <Heatmap days={heat} />
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="bg-accent rounded-2xl p-5">
+        <div className="bg-card/68 surface-3d shadow-lift rounded-[13px] p-5 backdrop-blur-md">
           <div className="mb-3 text-base font-semibold">Top words</div>
           <BarList entries={empty ? [] : data!.topWords} />
         </div>
-        <div className="bg-accent rounded-2xl p-5">
+        <div className="bg-card/68 surface-3d shadow-lift rounded-[13px] p-5 backdrop-blur-md">
           <div className="mb-4 flex items-center justify-between">
             <span className="text-base font-semibold">Where you pasted</span>
             {apps.length > 0 ? (
@@ -104,13 +108,13 @@ export function InsightsView() {
 function shadeColor(level: number): string {
   switch (level) {
     case 1:
-      return "hsl(248 53% 58% / 0.3)";
+      return "hsl(var(--primary) / 0.3)";
     case 2:
-      return "hsl(248 53% 58% / 0.52)";
+      return "hsl(var(--primary) / 0.52)";
     case 3:
-      return "hsl(248 53% 58% / 0.74)";
+      return "hsl(var(--primary) / 0.74)";
     case 4:
-      return "hsl(248 53% 58%)";
+      return "hsl(var(--primary))";
     default:
       return "hsl(var(--muted-foreground) / 0.16)";
   }
@@ -147,11 +151,11 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
   const dowLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
 
   return (
-    <div className="bg-accent mt-4 rounded-2xl p-5">
+    <div className="bg-card/68 surface-3d shadow-lift mt-4 rounded-[13px] p-5 backdrop-blur-md">
       <div className="mb-4 flex items-center justify-between">
         <div className="text-base font-semibold">Activity</div>
         {streak > 0 ? (
-          <span className="text-primary flex items-center gap-1.5 rounded-full bg-[hsl(248_53%_58%/0.14)] px-2.5 py-1 text-xs font-medium">
+          <span className="text-primary flex items-center gap-1.5 rounded-full bg-[hsl(var(--primary)/0.14)] px-2.5 py-1 text-xs font-medium">
             <Flame className="size-3.5" strokeWidth={2.25} />
             {streak} day{streak === 1 ? "" : "s"} streak
           </span>

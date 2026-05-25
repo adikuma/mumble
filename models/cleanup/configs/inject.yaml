@@ -1,0 +1,41 @@
+# synthetic disfluency injection recipe.
+#
+# clean text is the target. the injected (corrupted) version is the raw input.
+# because the only difference between raw and clean is inserted noise plus
+# removed punctuation, the model can only learn deletion and repunctuation, not
+# invention. this is what makes the data faithful by construction.
+
+# clean text source for training. transcript_c is the most minimal clean side
+# of disfluency speech (conversational, domain matched to dictation).
+clean_source:
+  dataset_id: amaai-lab/DisfluencySpeech
+  split: train
+  text_column: transcript_c
+
+# real held out eval set. transcript_a is real disfluent speech, transcript_c is
+# the gold clean target. never used in training.
+eval_source:
+  dataset_id: amaai-lab/DisfluencySpeech
+  split: test
+  raw_column: transcript_a
+  clean_column: transcript_c
+
+num_pairs: 4000
+val_fraction: 0.1
+seed: 42
+
+# corruption knobs. probabilities are per sentence unless noted.
+lowercase_strip_punctuation: 1.0   # always on, teaches punctuation and casing
+
+filler:
+  prob: 0.6                          # chance a sentence gets any fillers
+  per_gap_prob: 0.25                 # chance to insert at each word gap
+  words: [um, uh, er, ah, like, "you know", "i mean"]
+
+repetition:
+  prob: 0.4                          # chance a sentence gets a repeat
+  max_span_words: 3                  # repeat up to this many words
+
+false_start:
+  prob: 0.3                          # chance a sentence gets a false start
+  max_span_words: 4                  # abandon up to this many words then restart

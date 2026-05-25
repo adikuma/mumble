@@ -27,7 +27,7 @@ export function TranscriptAccordion({ transcripts, onChanged }: Props) {
     <Accordion
       type="single"
       collapsible
-      className="bg-card border-border surface-3d overflow-hidden rounded-[16px] border"
+      className="bg-card/68 border-border surface-3d shadow-lift overflow-hidden rounded-[13px] border backdrop-blur-md"
     >
       {transcripts.map((t) => (
         <Row key={t.id} transcript={t} onChanged={onChanged} />

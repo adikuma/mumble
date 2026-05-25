@@ -8,7 +8,7 @@ interface SettingRowProps {
 
 export function SettingRow({ title, desc, children }: SettingRowProps) {
   return (
-    <div className="bg-background border-border mb-2.5 flex items-center justify-between gap-4 rounded-[13px] border p-4 dark:bg-[hsl(240_5%_12%)]">
+    <div className="border-border flex items-center justify-between gap-4 border-b px-4 py-3.5 last:border-b-0">
       <div className="min-w-0">
         <div className="text-sm font-semibold">{title}</div>
         {desc ? (

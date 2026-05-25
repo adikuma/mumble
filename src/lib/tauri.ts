@@ -39,14 +39,6 @@ export interface Correction {
   corrected: string;
 }
 
-export interface Note {
-  id: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface DeviceInfo {
   name: string;
   isDefault: boolean;
@@ -168,17 +160,6 @@ export const updateDictionaryEntry = (
 
 export const deleteDictionaryEntry = (id: number): Promise<void> =>
   safeInvoke("delete_dictionary_entry", { id });
-
-export const listNotes = (): Promise<Note[]> => safeInvoke("list_notes");
-
-export const saveNote = (
-  id: string,
-  title: string,
-  body: string,
-): Promise<Note> => safeInvoke("save_note", { id, title, body });
-
-export const deleteNote = (id: string): Promise<void> =>
-  safeInvoke("delete_note", { id });
 
 export const hideMainWindow = (): Promise<void> =>
   safeInvoke("hide_main_window");

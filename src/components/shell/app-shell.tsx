@@ -8,20 +8,17 @@ import { cn } from "@/lib/utils";
 interface AppShellProps {
   page: Page;
   onNavigate: (p: Page) => void;
-  onOpenSettings: () => void;
   children: ReactNode;
 }
 
-export function AppShell({
-  page,
-  onNavigate,
-  onOpenSettings,
-  children,
-}: AppShellProps) {
+export function AppShell({ page, onNavigate, children }: AppShellProps) {
   const [manualCollapsed, setManualCollapsed] = useState(false);
   const width = useWindowWidth();
   const collapsed = manualCollapsed || width < 760;
   const bottomBar = width < 520;
+  // below 760 the sidebar is force collapsed (or a bottom bar), so the manual
+  // toggle does nothing. tell the topbar so it can render the button disabled.
+  const canToggleSidebar = width >= 760;
 
   return (
     <div
@@ -33,12 +30,14 @@ export function AppShell({
       <Sidebar
         page={page}
         onNavigate={onNavigate}
-        onOpenSettings={onOpenSettings}
         collapsed={collapsed}
         bottomBar={bottomBar}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onToggleSidebar={() => setManualCollapsed((c) => !c)} />
+        <Topbar
+          onToggleSidebar={() => setManualCollapsed((c) => !c)}
+          canToggle={canToggleSidebar}
+        />
         <Panel>{children}</Panel>
       </div>
     </div>

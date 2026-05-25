@@ -48,7 +48,7 @@ export function MicIndicator({
 
 function pillClasses(className?: string) {
   return cn(
-    "inline-flex items-center gap-2.5 rounded-[14px] py-2 pr-4 pl-3.5",
+    "inline-flex items-center gap-2.5 rounded-[12px] py-2 pr-4 pl-3.5",
     className,
   );
 }
@@ -145,15 +145,13 @@ function RecordingPill({
           Speak now
         </span>
       ) : (
-        <>
-          <Waveform active={active} variant={variant} bars={bars} />
-          <span
-            className="h-[15px] w-px shrink-0"
-            style={{ background: dividerColor(variant) }}
-          />
-          <Timer active={active} />
-        </>
+        <Waveform active={active} variant={variant} bars={bars} />
       )}
+      <span
+        className="h-[15px] w-px shrink-0"
+        style={{ background: dividerColor(variant) }}
+      />
+      <Timer active={active} />
     </div>
   );
 }

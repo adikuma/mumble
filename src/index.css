@@ -79,103 +79,6 @@
   }
 }
 
-/* rendered markdown in the scratchpad. minimal, clean, readable. */
-.md {
-  font-size: 14px;
-  line-height: 1.7;
-  color: hsl(var(--foreground));
-}
-.md > :first-child {
-  margin-top: 0;
-}
-.md h1 {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 1.4em 0 0.5em;
-}
-.md h2 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 1.3em 0 0.4em;
-}
-.md h3 {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 1.2em 0 0.4em;
-}
-.md p {
-  margin: 0.7em 0;
-}
-.md ul,
-.md ol {
-  margin: 0.7em 0;
-  padding-left: 1.4em;
-}
-.md ul {
-  list-style: disc;
-}
-.md ol {
-  list-style: decimal;
-}
-.md li {
-  margin: 0.2em 0;
-}
-.md a {
-  color: hsl(var(--primary));
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.md code {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: 0.88em;
-  background: hsl(var(--muted));
-  padding: 0.12em 0.36em;
-  border-radius: 5px;
-}
-.md pre {
-  background: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  padding: 12px 14px;
-  overflow-x: auto;
-  margin: 0.9em 0;
-}
-.md pre code {
-  background: none;
-  padding: 0;
-  font-size: 12.5px;
-}
-.md blockquote {
-  border-left: 3px solid hsl(var(--border-strong));
-  padding-left: 14px;
-  margin: 0.9em 0;
-  color: hsl(var(--muted-foreground));
-}
-.md hr {
-  border: 0;
-  border-top: 1px solid hsl(var(--border));
-  margin: 1.3em 0;
-}
-.md strong {
-  font-weight: 600;
-}
-.md table {
-  border-collapse: collapse;
-  margin: 0.9em 0;
-  font-size: 13px;
-}
-.md th,
-.md td {
-  border: 1px solid hsl(var(--border));
-  padding: 6px 10px;
-  text-align: left;
-}
-.md img {
-  max-width: 100%;
-  border-radius: 8px;
-}
-
 /* all color tokens are bare hsl triplets. the @theme inline block above wraps
  * them in hsl() for tailwind utilities, and raw css below wraps them too. this
  * lets both `bg-card` and `bg-[hsl(var(--muted))]` resolve correctly. */
@@ -183,7 +86,7 @@
 /* light mode. tinted warm canvas so white cards float above the background.
  * sidebar stays warm cream as the distinct plane. indigo primary for focus. */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 
   --background: 40 14% 95.5%;
   --foreground: 0 0% 9%;
@@ -194,8 +97,8 @@
   --popover: 0 0% 100%;
   --popover-foreground: 240 10% 3.9%;
 
-  --primary: 248 53% 58%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 38 92% 50%;
+  --primary-foreground: 30 45% 12%;
 
   --secondary: 240 4.8% 95.9%;
   --secondary-foreground: 240 5.9% 10%;
@@ -266,14 +169,15 @@
 @layer base {
   * {
     border-color: hsl(var(--border));
-    /* disable overscroll bounce so the webview2 surface never reveals
-     * the layer behind the window when the user scrolls past content. */
-    overscroll-behavior: none;
   }
   html,
   body,
   #root {
     height: 100%;
+    /* disable overscroll bounce so the webview2 surface never reveals the
+     * layer behind the window. kept off the universal selector so that
+     * overflow-hidden cards do not trap the wheel and block scrolling. */
+    overscroll-behavior: none;
   }
   body {
     background-color: hsl(var(--background));
@@ -330,6 +234,31 @@ body.indicator-window #root {
   font-variant-numeric: tabular-nums;
 }
 
+/* the main content panel paints an atmospheric image behind frosted content. a
+ * translucent card colored scrim over the image keeps it subtle and the text
+ * readable. light and dark ship different art. */
+.panel-bg {
+  background-image:
+    linear-gradient(180deg, hsl(var(--card) / 0.3), hsl(var(--card) / 0.44)),
+    url("/bg-light.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* the source is tiny (80px), so upscaling it blocky gives the pixelated look
+   * while the downscale averaging keeps it soft and abstract. */
+  image-rendering: pixelated;
+  /* push the pixel pattern's dynamic range so the bg reads punchy, not muddy.
+   * light mode brightens, dark mode darkens, both gain contrast. the filter
+   * sits on this dedicated layer so the content above is never touched. */
+  filter: contrast(1.18);
+}
+.dark .panel-bg {
+  background-image:
+    linear-gradient(180deg, hsl(var(--card) / 0.5), hsl(var(--card) / 0.66)),
+    url("/bg-dark.png");
+  filter: contrast(1.5) brightness(1);
+}
+
 @layer utilities {
   .shadow-lift {
     box-shadow:
@@ -376,13 +305,27 @@ body.indicator-window #root {
       inset 0 0 0 1px hsl(0 0% 100% / 0.07);
   }
 
-  @keyframes mumble-flash {
-    0% {
-      background-color: hsl(248 53% 58% / 0.35);
-    }
-    100% {
-      background-color: hsl(248 53% 58% / 0);
-    }
+  /* accent variant of the bevel: only the top highlight and bottom shadow are
+   * tinted, never a full ring, so the edge reads colored without a border.
+   * amber in light, purple in dark. pairs with the base surface-3d class which
+   * supplies the pseudo element. */
+  .surface-3d-accent::after {
+    box-shadow:
+      inset 0 1px 0 hsl(45 100% 72% / 0.95),
+      inset 0 -1px 0 hsl(30 88% 42% / 0.6);
+  }
+  .dark .surface-3d-accent::after {
+    box-shadow:
+      inset 0 1px 0 hsl(252 100% 86% / 0.55),
+      inset 0 -1px 0 hsl(248 75% 62% / 0.5);
   }
 
+  @keyframes mumble-flash {
+    0% {
+      background-color: hsl(var(--primary) / 0.35);
+    }
+    100% {
+      background-color: hsl(var(--primary) / 0);
+    }
+  }
 }

@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
 
 /**
- * compact theme toggle. two icon cells inside a rounded lg container.
- * lives in the app header. the sidebar no longer carries this.
+ * compact theme toggle. two icon cells inside a rounded container. lives in the
+ * settings page under appearance.
  */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -20,7 +20,7 @@ export function ThemeToggle() {
       : theme;
 
   return (
-    <div className="border-border flex h-7 items-center gap-0.5 rounded-[9px] border bg-[hsl(40_8%_90%)] p-[2px] dark:bg-[hsl(240_7%_5%)]">
+    <div className="border-border flex h-7 items-center gap-0.5 rounded-[8px] border bg-[hsl(40_8%_90%)] p-[2px] dark:bg-[hsl(240_7%_5%)]">
       <Cell
         active={effective === "light"}
         onClick={() => setTheme("light")}

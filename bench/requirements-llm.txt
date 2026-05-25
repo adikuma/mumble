@@ -1,0 +1,7 @@
+# llm cleanup prototype, pinned and supply chain vetted (verified 2026-05-24).
+# cpu only. all four ship prebuilt wheels so nothing compiles from source.
+# torch on the default pypi index is the cpu build on windows. installed with uv.
+torch==2.10.0
+transformers==5.8.1
+tokenizers==0.22.1
+safetensors==0.6.2

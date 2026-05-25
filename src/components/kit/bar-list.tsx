@@ -11,7 +11,10 @@ export function BarList({ entries }: { entries: BarEntry[] }) {
   return (
     <div>
       {entries.map((e, i) => (
-        <div key={`${e.label}-${i}`} className="flex items-center gap-3 py-2 text-sm">
+        <div
+          key={`${e.label}-${i}`}
+          className="flex items-center gap-3 py-2 text-sm"
+        >
           <span className="w-[120px] truncate">{e.label}</span>
           <span className="bg-muted relative h-2 flex-1 overflow-hidden rounded-full">
             <span

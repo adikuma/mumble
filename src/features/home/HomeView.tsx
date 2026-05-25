@@ -1,18 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { SearchBar } from "@/components/kit/search-bar";
+import { useEffect, useMemo } from "react";
 import { TranscriptAccordion } from "@/features/home/TranscriptAccordion";
 import { groupByRecency } from "@/features/history/group-helpers";
 import {
@@ -20,7 +6,7 @@ import {
   avgWpmThisWeek,
   currentStreakDays,
 } from "@/features/home/home-helpers";
-import { listHistory, clearHistory } from "@/lib/tauri";
+import { listHistory } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
 
@@ -36,17 +22,10 @@ export function HomeView() {
   const transcripts = useMumbleStore((s) => s.transcripts);
   const setTranscripts = useMumbleStore((s) => s.setTranscripts);
   const settings = useMumbleStore((s) => s.settings);
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query), 150);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  useEffect(() => {
-    listHistory(debounced || undefined).then(setTranscripts);
-  }, [debounced, setTranscripts]);
+    listHistory().then(setTranscripts);
+  }, [setTranscripts]);
 
   const groups = useMemo(() => groupByRecency(transcripts), [transcripts]);
   const stats = useMemo(
@@ -60,74 +39,31 @@ export function HomeView() {
   const hotkey = formatHotkey(settings?.hotkey ?? "Right Alt");
 
   async function refresh() {
-    setTranscripts(await listHistory(debounced || undefined));
-  }
-
-  async function handleClearAll() {
-    await clearHistory();
-    toast.success("History cleared");
-    await refresh();
+    setTranscripts(await listHistory());
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-9 py-9">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
-            {greeting()}
-          </h1>
-          <p className="text-muted-foreground mt-1.5 text-sm">
-            Hold <span className="kbd">{hotkey}</span> and speak, anywhere you
-            type.
-          </p>
+    <div className="mx-auto w-full max-w-[880px] px-9 pb-9">
+      <div className="sticky top-0 z-10 -mx-9 px-9 pt-9 pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
+              {greeting()}
+            </h1>
+            <p className="text-muted-foreground mt-1.5 text-sm">
+              Hold <span className="kbd">{hotkey}</span> and speak, anywhere you
+              type.
+            </p>
+          </div>
+          <div className="flex gap-7 pt-1">
+            <Stat label="Words today" value={stats.words.toLocaleString()} />
+            <Stat
+              label="Words / min"
+              value={stats.wpm == null ? "—" : String(stats.wpm)}
+            />
+            <Stat label="Streak" value={String(stats.streak)} unit="d" />
+          </div>
         </div>
-        <div className="flex gap-7 pt-1">
-          <Stat label="Words today" value={stats.words.toLocaleString()} />
-          <Stat
-            label="Words / min"
-            value={stats.wpm == null ? "—" : String(stats.wpm)}
-          />
-          <Stat label="Streak" value={String(stats.streak)} unit="d" />
-        </div>
-      </div>
-
-      <div className="mt-7 flex items-center gap-3">
-        <div className="flex-1">
-          <SearchBar
-            value={query}
-            onChange={setQuery}
-            placeholder="Search your dictations"
-          />
-        </div>
-        {transcripts.length > 0 ? (
-          <Dialog>
-            <DialogTrigger asChild>
-              <button className="text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1.5 rounded-[10px] px-3 py-2.5 text-sm">
-                <Trash2 className="size-4" />
-                Clear all
-              </button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Clear all history?</DialogTitle>
-                <DialogDescription>
-                  This deletes every transcript permanently. Nothing leaves your
-                  machine, it is a local delete.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="ghost">Cancel</Button>
-                </DialogClose>
-                <DialogClose asChild>
-                  <Button variant="destructive" onClick={handleClearAll}>
-                    Clear all
-                  </Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        ) : null}
       </div>
 
       {groups.length === 0 ? (
