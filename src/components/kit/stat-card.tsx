@@ -19,7 +19,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "bg-card/68 surface-3d shadow-lift flex items-center justify-between rounded-[13px] p-5 backdrop-blur-md",
+        "bg-card border-border flex min-h-[116px] items-center justify-between rounded-[13px] border p-5",
         className,
       )}
     >
@@ -32,7 +32,7 @@ export function StatCard({
             </span>
           ) : null}
         </div>
-        <div className="text-muted-foreground mt-2 text-[11px] font-semibold tracking-[0.07em] uppercase">
+        <div className="text-muted-foreground mt-2 text-[12px] font-semibold tracking-[0.07em] uppercase">
           {label}
         </div>
       </div>

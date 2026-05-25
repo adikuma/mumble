@@ -53,14 +53,14 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "bg-sidebar flex shrink-0 flex-col p-3 transition-[width] duration-200 ease-out",
+        "bg-sidebar relative flex shrink-0 flex-col py-3 pr-2 pl-3 transition-[width] duration-200 ease-out",
         collapsed ? "w-[68px]" : "w-[228px]",
       )}
     >
       <div className="flex items-center gap-2.5 px-2 py-1.5">
         <Logo size={28} />
         {!collapsed ? (
-          <span className="text-[18px] font-semibold tracking-[-0.01em]">
+          <span className="text-[20px] font-semibold tracking-[-0.01em]">
             Mumble
           </span>
         ) : null}
@@ -108,11 +108,11 @@ function NavButton({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-[8px] px-2.5 py-2.5 text-sm font-medium transition-colors",
+        "flex w-full items-center gap-3 rounded-[8px] px-2.5 py-2.5 text-sm font-medium transition-colors",
         collapsed && "justify-center",
         active
-          ? "bg-card text-foreground shadow-lift surface-3d font-semibold"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          ? "bg-background text-foreground dark:bg-sidebar-accent font-semibold"
+          : "text-muted-foreground hover:bg-background hover:text-foreground dark:hover:bg-accent",
       )}
     >
       <Icon className="size-[18px] shrink-0" strokeWidth={1.8} />

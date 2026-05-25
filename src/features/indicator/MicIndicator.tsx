@@ -139,7 +139,7 @@ function RecordingPill({
       />
       {active && !spoken ? (
         <span
-          className="shrink-0 text-[12px] font-medium tracking-tight"
+          className="shrink-0 text-[13px] font-medium tracking-tight"
           style={{ opacity: 0.85 }}
         >
           Speak now
@@ -177,7 +177,7 @@ function StatusPill({
         strokeWidth={2.25}
         style={{ color: variant === "dark" ? "#9c91f5" : "#6d5fe8" }}
       />
-      <span className="text-[12px] font-medium tracking-tight">{label}…</span>
+      <span className="text-[13px] font-medium tracking-tight">{label}…</span>
     </div>
   );
 }

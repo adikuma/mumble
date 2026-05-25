@@ -10,9 +10,13 @@ import { useMumbleStore } from "@/store";
 import { StatCard } from "@/components/kit/stat-card";
 import { BarList } from "@/components/kit/bar-list";
 import { WpmGauge } from "@/components/kit/wpm-gauge";
-import { AppIconGrid } from "@/components/kit/app-icon-grid";
+import { AppGrid, Page, PageHeader, Surface } from "@/components/kit/layout";
+import { AppIcon } from "@/features/history/AppIcon";
 import { avgWpmThisWeek } from "@/features/home/home-helpers";
-import { topPastedApps } from "@/features/insights/insights-helpers";
+import {
+  topPastedApps,
+  type PastedApp,
+} from "@/features/insights/insights-helpers";
 
 // a full year so the contribution heatmap fills the card like github's.
 const HEATMAP_DAYS = 364;
@@ -48,23 +52,24 @@ export function InsightsView() {
 
   const empty = !data || data.sessions === 0;
   const wpm = useMemo(() => avgWpmThisWeek(transcripts), [transcripts]);
-  const apps = useMemo(() => topPastedApps(transcripts), [transcripts]);
+  const apps = useMemo(() => topPastedApps(transcripts, 24), [transcripts]);
+  const topApps = apps.slice(0, 3);
+  const avgWords =
+    !empty && data!.sessions > 0 ? Math.round(data!.words / data!.sessions) : 0;
   const dash = "—";
 
   return (
-    <div className="mx-auto w-full max-w-[880px] px-9 pb-9">
-      <div className="sticky top-0 z-10 -mx-9 px-9 pt-9 pb-4">
-        <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
-          Insights
-        </h1>
-        <p className="text-muted-foreground mt-1.5 text-sm">
-          {empty
+    <Page>
+      <PageHeader
+        title="Insights"
+        description={
+          empty
             ? "Your dictation stats will appear here."
-            : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week, across ${data!.sessions} ${data!.sessions === 1 ? "dictation" : "dictations"}.`}
-        </p>
-      </div>
+            : `You spoke for ${formatMinutes(data!.timeSavedSec)} this week, across ${data!.sessions} ${data!.sessions === 1 ? "dictation" : "dictations"}.`
+        }
+      />
 
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <AppGrid columns="stats" className="mt-6">
         <StatCard
           label="Words / min"
           value={empty || wpm == null ? dash : String(wpm)}
@@ -80,27 +85,121 @@ export function InsightsView() {
           label="Total words"
           value={empty ? dash : data!.words.toLocaleString()}
         />
-      </div>
+      </AppGrid>
+
+      <MetricsStrip
+        items={[
+          { label: "Dictations", value: empty ? dash : data!.sessions },
+          { label: "Avg words", value: empty ? dash : avgWords },
+          {
+            label: "Apps used",
+            value: empty ? dash : Math.max(apps.length, data!.topApps.length),
+          },
+          {
+            label: "Avg latency",
+            value:
+              empty || data!.avgLatencyMs == null
+                ? dash
+                : `${Math.round(data!.avgLatencyMs)} ms`,
+          },
+        ]}
+      />
 
       <Heatmap days={heat} />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="bg-card/68 surface-3d shadow-lift rounded-[13px] p-5 backdrop-blur-md">
+      <AppGrid className="mt-4">
+        <Surface className="min-h-[280px] p-5">
           <div className="mb-3 text-base font-semibold">Top words</div>
           <BarList entries={empty ? [] : data!.topWords} />
-        </div>
-        <div className="bg-card/68 surface-3d shadow-lift rounded-[13px] p-5 backdrop-blur-md">
+        </Surface>
+        <Surface className="min-h-[280px] p-5">
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-base font-semibold">Where you pasted</span>
-            {apps.length > 0 ? (
-              <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.07em] uppercase">
-                {apps.length} apps
+            <span className="text-base font-semibold">Top apps used</span>
+            {topApps.length > 0 ? (
+              <span className="text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase">
+                top {topApps.length}
               </span>
             ) : null}
           </div>
-          <AppIconGrid apps={apps} />
-        </div>
+          <TopApps
+            apps={topApps}
+            total={apps.reduce((n, a) => n + a.count, 0)}
+          />
+        </Surface>
+      </AppGrid>
+    </Page>
+  );
+}
+
+function MetricsStrip({
+  items,
+}: {
+  items: { label: string; value: string | number }[];
+}) {
+  return (
+    <Surface className="mt-4">
+      <div className="grid grid-cols-2 md:grid-cols-4">
+        {items.map((item, index) => (
+          <div
+            key={item.label}
+            className="border-border px-4 py-4 md:border-l first:md:border-l-0"
+            data-index={index}
+          >
+            <div className="text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase">
+              {item.label}
+            </div>
+            <div className="mt-2 text-2xl font-semibold tabular-nums">
+              {item.value}
+            </div>
+          </div>
+        ))}
       </div>
+    </Surface>
+  );
+}
+
+function TopApps({ apps, total }: { apps: PastedApp[]; total: number }) {
+  if (apps.length === 0) {
+    return <p className="text-muted-foreground py-4 text-sm">No apps yet.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {apps.map((app, index) => {
+        const pct = total > 0 ? Math.round((app.count / total) * 100) : 0;
+        return (
+          <div
+            key={app.name}
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-4"
+          >
+            <div className="bg-background flex size-11 items-center justify-center rounded-[10px]">
+              <AppIcon exePath={app.path} appName={app.name} size={26} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  #{index + 1}
+                </span>
+                <span className="truncate text-sm font-semibold">
+                  {app.name}
+                </span>
+              </div>
+              <div className="bg-muted mt-2 h-2 overflow-hidden rounded-full">
+                <div
+                  className="bg-primary h-full rounded-full"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-semibold tabular-nums">
+                {app.count}
+              </div>
+              <div className="text-muted-foreground text-xs">{pct}%</div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -151,7 +250,7 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
   const dowLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
 
   return (
-    <div className="bg-card/68 surface-3d shadow-lift mt-4 rounded-[13px] p-5 backdrop-blur-md">
+    <Surface className="mt-4 p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="text-base font-semibold">Activity</div>
         {streak > 0 ? (
@@ -163,7 +262,7 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
       </div>
 
       <div className="flex gap-1.5">
-        <div className="text-muted-foreground flex w-6 shrink-0 flex-col gap-[2px] text-[9px]">
+        <div className="text-muted-foreground flex w-6 shrink-0 flex-col gap-[2px] text-[10px]">
           {dowLabels.map((l, i) => (
             <span key={i} className="flex flex-1 items-center leading-none">
               {l}
@@ -190,7 +289,7 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
         </div>
       </div>
 
-      <div className="text-muted-foreground mt-3 flex items-center justify-end gap-1.5 text-[10px]">
+      <div className="text-muted-foreground mt-3 flex items-center justify-end gap-1.5 text-[11px]">
         Less
         {[0, 1, 2, 3, 4].map((l) => (
           <span
@@ -201,6 +300,6 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
         ))}
         More
       </div>
-    </div>
+    </Surface>
   );
 }

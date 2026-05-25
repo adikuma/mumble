@@ -27,7 +27,7 @@ export function TranscriptAccordion({ transcripts, onChanged }: Props) {
     <Accordion
       type="single"
       collapsible
-      className="bg-card/68 border-border surface-3d shadow-lift overflow-hidden rounded-[13px] border backdrop-blur-md"
+      className="bg-card border-border overflow-hidden rounded-[13px] border"
     >
       {transcripts.map((t) => (
         <Row key={t.id} transcript={t} onChanged={onChanged} />
@@ -136,7 +136,7 @@ function Row({
               </button>
               <button
                 onClick={saveEdit}
-                className="bg-foreground text-background rounded-md px-3 py-1.5 text-xs font-semibold"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
               >
                 Save
               </button>

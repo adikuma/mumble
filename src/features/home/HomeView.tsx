@@ -9,6 +9,7 @@ import {
 import { listHistory } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
+import { Page, PageHeader, SectionLabel } from "@/components/kit/layout";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -43,18 +44,15 @@ export function HomeView() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[880px] px-9 pb-9">
-      <div className="sticky top-0 z-10 -mx-9 px-9 pt-9 pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
-              {greeting()}
-            </h1>
-            <p className="text-muted-foreground mt-1.5 text-sm">
-              Hold <span className="kbd">{hotkey}</span> and speak, anywhere you
-              type.
-            </p>
-          </div>
+    <Page>
+      <PageHeader
+        title={greeting()}
+        description={
+          <>
+            Hold <span className="kbd">{hotkey}</span> to dictate.
+          </>
+        }
+        actions={
           <div className="flex gap-7 pt-1">
             <Stat label="Words today" value={stats.words.toLocaleString()} />
             <Stat
@@ -63,8 +61,8 @@ export function HomeView() {
             />
             <Stat label="Streak" value={String(stats.streak)} unit="d" />
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {groups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -72,21 +70,18 @@ export function HomeView() {
             No dictations yet
           </p>
           <p className="text-muted-foreground mt-2 text-sm">
-            Hold <span className="kbd">{hotkey}</span> and speak to make your
-            first one.
+            Hold <span className="kbd">{hotkey}</span> for your first dictation.
           </p>
         </div>
       ) : (
         groups.map((g) => (
           <section key={g.key}>
-            <h3 className="text-muted-foreground mt-7 mb-2.5 text-[11px] font-semibold tracking-[0.06em] uppercase">
-              {g.key}
-            </h3>
+            <SectionLabel className="mt-7 mb-2.5">{g.key}</SectionLabel>
             <TranscriptAccordion transcripts={g.items} onChanged={refresh} />
           </section>
         ))
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -101,10 +96,10 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-muted-foreground text-[11px] font-semibold tracking-[0.07em] uppercase">
+      <div className="text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase">
         {label}
       </div>
-      <div className="mt-1.5 text-[22px] font-semibold tracking-[-0.01em] tabular-nums">
+      <div className="mt-1.5 text-[24px] font-semibold tracking-[-0.01em] tabular-nums">
         {value}
         {unit ? (
           <span className="text-muted-foreground ml-0.5 text-sm font-normal">

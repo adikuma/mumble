@@ -11,6 +11,7 @@ import {
 import { captureHotkey, isTauri } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
+import { SettingSection } from "@/components/kit/layout";
 import { SettingRow } from "@/features/settings/setting-row";
 import { useUpdateSettings } from "@/features/settings/use-update-settings";
 
@@ -42,62 +43,57 @@ export function GeneralPanel() {
   const preRoll = String(settings?.preRollMs ?? 0);
 
   return (
-    <>
-      <h2 className="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.07em] uppercase">
-        General
-      </h2>
-      <div className="bg-card/68 border-border surface-3d shadow-lift overflow-hidden rounded-[13px] border backdrop-blur-md">
-        <SettingRow
-          title="Push-to-talk hotkey"
-          desc="Hold to record, release to transcribe and paste."
+    <SettingSection title="General">
+      <SettingRow
+        title="Push-to-talk hotkey"
+        desc="Hold to record, release to transcribe and paste."
+      >
+        <span className="kbd">{capturing ? "Press any key…" : hotkey}</span>
+        <button
+          onClick={rebind}
+          disabled={capturing}
+          className="border-border bg-card hover:bg-muted dark:hover:bg-secondary rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
         >
-          <span className="kbd">{capturing ? "Press any key…" : hotkey}</span>
-          <button
-            onClick={rebind}
-            disabled={capturing}
-            className="border-border hover:bg-accent rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
-            {capturing ? "Listening…" : "Change"}
-          </button>
-        </SettingRow>
-        <SettingRow
-          title="Auto-paste at cursor"
-          desc="Drop the transcript wherever your caret is."
+          {capturing ? "Listening…" : "Change"}
+        </button>
+      </SettingRow>
+      <SettingRow
+        title="Auto-paste at cursor"
+        desc="Drop the transcript wherever your caret is."
+      >
+        <Switch
+          checked={autoPaste}
+          onCheckedChange={(v) => update({ autoPaste: v })}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Launch at login"
+        desc="Start Mumble when Windows starts."
+      >
+        <Switch
+          checked={launchAtLogin}
+          onCheckedChange={(v) => update({ launchAtLogin: v })}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Pre-roll buffer"
+        desc="Capture audio just before the key so it never clips you."
+      >
+        <Select
+          value={preRoll}
+          onValueChange={(v) => update({ preRollMs: Number(v) })}
         >
-          <Switch
-            checked={autoPaste}
-            onCheckedChange={(v) => update({ autoPaste: v })}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Launch at login"
-          desc="Start Mumble when Windows starts."
-        >
-          <Switch
-            checked={launchAtLogin}
-            onCheckedChange={(v) => update({ launchAtLogin: v })}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Pre-roll buffer"
-          desc="Capture audio just before the key so it never clips you."
-        >
-          <Select
-            value={preRoll}
-            onValueChange={(v) => update({ preRollMs: Number(v) })}
-          >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">Off</SelectItem>
-              <SelectItem value="250">250 ms</SelectItem>
-              <SelectItem value="450">450 ms</SelectItem>
-              <SelectItem value="800">800 ms</SelectItem>
-            </SelectContent>
-          </Select>
-        </SettingRow>
-      </div>
-    </>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">Off</SelectItem>
+            <SelectItem value="250">250 ms</SelectItem>
+            <SelectItem value="450">450 ms</SelectItem>
+            <SelectItem value="800">800 ms</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingRow>
+    </SettingSection>
   );
 }

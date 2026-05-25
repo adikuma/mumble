@@ -50,12 +50,11 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* type scale. desktop utility, smaller than web defaults.
-   * 11, 13, 15, 18 px. */
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 15px;
-  --text-lg: 18px;
+  /* type scale. desktop utility, bumped one step for readability. */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
 
   /* accordion expand and collapse, driven by radix content height. */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -83,85 +82,84 @@
  * them in hsl() for tailwind utilities, and raw css below wraps them too. this
  * lets both `bg-card` and `bg-[hsl(var(--muted))]` resolve correctly. */
 
-/* light mode. tinted warm canvas so white cards float above the background.
- * sidebar stays warm cream as the distinct plane. indigo primary for focus. */
+/* light mode. clean white workspace with warm contrasting surfaces and amber
+ * as the brand accent. */
 :root {
   --radius: 0.5rem;
 
-  --background: 40 14% 95.5%;
+  --background: 0 0% 98.5%;
   --foreground: 0 0% 9%;
 
-  --card: 0 0% 100%;
+  --card: 42 20% 95%;
   --card-foreground: 0 0% 9%;
 
-  --popover: 0 0% 100%;
+  --popover: 42 20% 95%;
   --popover-foreground: 240 10% 3.9%;
 
-  --primary: 38 92% 50%;
-  --primary-foreground: 30 45% 12%;
+  --primary: 36 86% 58%;
+  --primary-foreground: 30 45% 10%;
 
-  --secondary: 240 4.8% 95.9%;
+  --secondary: 42 20% 95%;
   --secondary-foreground: 240 5.9% 10%;
 
-  --muted: 0 0% 95%;
-  --muted-foreground: 0 0% 45%;
+  --muted: 42 18% 92%;
+  --muted-foreground: 0 0% 38%;
 
-  --accent: 48 25% 94%;
+  --accent: 42 20% 95%;
   --accent-foreground: 0 0% 12%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 91%;
-  --border-strong: 0 0% 85%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
+  --border: 42 16% 84%;
+  --border-strong: 42 12% 74%;
+  --input: 42 16% 84%;
+  --ring: 35 92% 52%;
 
-  --sidebar: 40 14% 95.5%;
+  --sidebar: 42 20% 95%;
   --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-border: 40 15% 90%;
-  --sidebar-accent: 45 25% 92%;
+  --sidebar-border: 42 14% 84%;
+  --sidebar-accent: 42 18% 90%;
   --sidebar-accent-foreground: 240 5.9% 10%;
-  --sidebar-ring: 240 5.9% 10%;
+  --sidebar-ring: 35 92% 52%;
 }
 
-/* dark mode uses shadcn default neutrals (near black zinc) for the base, with
- * cards and popovers lifted above the background so surfaces separate the way
- * they do in light mode. the indigo primary carries over as the brand accent. */
+/* dark mode is quieter: sidebar and frame match the canvas, while borders
+ * provide separation. purple stays as the brand accent. */
 .dark {
-  --background: 240 10% 3.9%;
+  --background: 240 6% 7%;
   --foreground: 0 0% 98%;
 
-  --card: 240 6% 9%;
+  --card: 240 4% 12%;
   --card-foreground: 0 0% 98%;
 
-  --popover: 240 6% 9%;
+  --popover: 240 4% 12%;
   --popover-foreground: 0 0% 98%;
 
-  --primary: 248 70% 72%;
-  --primary-foreground: 240 6% 10%;
+  --primary: 258 76% 74%;
+  --primary-foreground: 260 38% 10%;
 
-  --secondary: 240 3.7% 15.9%;
+  --secondary: 240 4% 14%;
   --secondary-foreground: 0 0% 98%;
 
-  --muted: 240 3.7% 15.9%;
+  --muted: 240 4% 16%;
   --muted-foreground: 240 5% 64.9%;
 
-  --accent: 240 3.7% 15.9%;
+  --accent: 240 4% 16%;
   --accent-foreground: 0 0% 98%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 240 3.7% 15.9%;
-  --border-strong: 240 3.7% 22%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --border: 240 4% 19%;
+  --border-strong: 240 4% 26%;
+  --input: 240 4% 18%;
+  --ring: 258 76% 74%;
 
-  --sidebar: 240 10% 3.9%;
+  --sidebar: 240 6% 7%;
   --sidebar-foreground: 240 4.8% 95.9%;
-  --sidebar-border: 240 3.7% 15.9%;
-  --sidebar-accent: 240 3.7% 15.9%;
+  --sidebar-border: 240 4% 19%;
+  --sidebar-accent: 240 4% 16%;
   --sidebar-accent-foreground: 240 4.8% 95.9%;
   --sidebar-ring: 240 4.9% 83.9%;
 }
@@ -227,99 +225,37 @@ body.indicator-window #root {
   padding: 0 8px;
   border: 1px solid hsl(var(--border));
   border-radius: 6px;
-  background: hsl(var(--background));
+  background: hsl(var(--card));
   color: hsl(var(--foreground));
   font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+.dark .kbd {
+  background: hsl(var(--secondary));
+}
 
-/* the main content panel paints an atmospheric image behind frosted content. a
- * translucent card colored scrim over the image keeps it subtle and the text
- * readable. light and dark ship different art. */
+/* the main content panel is intentionally plain. visual interest should come
+ * from layout, color, and content, not from decorative backgrounds. */
 .panel-bg {
-  background-image:
-    linear-gradient(180deg, hsl(var(--card) / 0.3), hsl(var(--card) / 0.44)),
-    url("/bg-light.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  /* the source is tiny (80px), so upscaling it blocky gives the pixelated look
-   * while the downscale averaging keeps it soft and abstract. */
-  image-rendering: pixelated;
-  /* push the pixel pattern's dynamic range so the bg reads punchy, not muddy.
-   * light mode brightens, dark mode darkens, both gain contrast. the filter
-   * sits on this dedicated layer so the content above is never touched. */
-  filter: contrast(1.18);
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    hsl(var(--foreground) / 0.045) 1px,
+    transparent 0
+  );
+  background-size: 18px 18px;
 }
 .dark .panel-bg {
-  background-image:
-    linear-gradient(180deg, hsl(var(--card) / 0.5), hsl(var(--card) / 0.66)),
-    url("/bg-dark.png");
-  filter: contrast(1.5) brightness(1);
+  background-color: hsl(var(--background));
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    hsl(var(--foreground) / 0.055) 1px,
+    transparent 0
+  );
 }
 
 @layer utilities {
-  .shadow-lift {
-    box-shadow:
-      0 1px 2px hsl(40 10% 45% / 0.05),
-      0 2px 5px hsl(40 10% 40% / 0.045);
-  }
-  .dark .shadow-lift {
-    box-shadow:
-      0 1px 2px hsl(0 0% 0% / 0.22),
-      0 2px 6px hsl(0 0% 0% / 0.2);
-  }
-  .shadow-lift-hover {
-    box-shadow:
-      0 2px 6px hsl(40 10% 40% / 0.09),
-      0 6px 16px hsl(40 10% 40% / 0.08);
-  }
-  .dark .shadow-lift-hover {
-    box-shadow:
-      0 3px 10px hsl(0 0% 0% / 0.34),
-      0 10px 24px hsl(0 0% 0% / 0.3);
-  }
-
-  /* subtle beveled edge for raised surfaces. a hairline light rim catches the
-   * light around the edges, brightest along the top, the way native dark
-   * toolbars and pills do. only the edge is touched, never the face. it reads
-   * strongest in dark mode. */
-  .surface-3d {
-    position: relative;
-  }
-  .surface-3d::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.7),
-      inset 0 -1px 0 hsl(40 10% 35% / 0.05),
-      inset 0 0 0 1px hsl(0 0% 100% / 0.02);
-  }
-  .dark .surface-3d::after {
-    box-shadow:
-      inset 0 1px 0 hsl(0 0% 100% / 0.12),
-      inset 0 0 0 1px hsl(0 0% 100% / 0.07);
-  }
-
-  /* accent variant of the bevel: only the top highlight and bottom shadow are
-   * tinted, never a full ring, so the edge reads colored without a border.
-   * amber in light, purple in dark. pairs with the base surface-3d class which
-   * supplies the pseudo element. */
-  .surface-3d-accent::after {
-    box-shadow:
-      inset 0 1px 0 hsl(45 100% 72% / 0.95),
-      inset 0 -1px 0 hsl(30 88% 42% / 0.6);
-  }
-  .dark .surface-3d-accent::after {
-    box-shadow:
-      inset 0 1px 0 hsl(252 100% 86% / 0.55),
-      inset 0 -1px 0 hsl(248 75% 62% / 0.5);
-  }
-
   @keyframes mumble-flash {
     0% {
       background-color: hsl(var(--primary) / 0.35);

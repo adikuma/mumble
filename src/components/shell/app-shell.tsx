@@ -23,7 +23,7 @@ export function AppShell({ page, onNavigate, children }: AppShellProps) {
   return (
     <div
       className={cn(
-        "bg-background text-foreground flex h-screen w-screen overflow-hidden",
+        "bg-sidebar text-foreground flex h-screen w-screen overflow-hidden",
         bottomBar && "flex-col-reverse",
       )}
     >
@@ -33,12 +33,15 @@ export function AppShell({ page, onNavigate, children }: AppShellProps) {
         collapsed={collapsed}
         bottomBar={bottomBar}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar
-          onToggleSidebar={() => setManualCollapsed((c) => !c)}
-          canToggle={canToggleSidebar}
-        />
-        <Panel>{children}</Panel>
+      <div className="bg-sidebar flex min-h-0 min-w-0 flex-1 flex-col">
+        <Topbar />
+        <Panel
+          canToggle={canToggleSidebar && !bottomBar}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setManualCollapsed((c) => !c)}
+        >
+          {children}
+        </Panel>
       </div>
     </div>
   );

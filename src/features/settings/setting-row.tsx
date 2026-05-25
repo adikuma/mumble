@@ -12,7 +12,7 @@ export function SettingRow({ title, desc, children }: SettingRowProps) {
       <div className="min-w-0">
         <div className="text-sm font-semibold">{title}</div>
         {desc ? (
-          <div className="text-muted-foreground mt-0.5 text-[13px]">{desc}</div>
+          <div className="text-muted-foreground mt-0.5 text-[14px]">{desc}</div>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>

@@ -20,7 +20,7 @@ export function ThemeToggle() {
       : theme;
 
   return (
-    <div className="border-border flex h-7 items-center gap-0.5 rounded-[8px] border bg-[hsl(40_8%_90%)] p-[2px] dark:bg-[hsl(240_7%_5%)]">
+    <div className="bg-muted border-border flex h-7 items-center gap-0.5 rounded-[8px] border p-[2px]">
       <Cell
         active={effective === "light"}
         onClick={() => setTheme("light")}
@@ -59,8 +59,8 @@ function Cell({
       className={cn(
         "inline-flex h-6 w-7 items-center justify-center rounded-md transition-colors",
         active
-          ? "surface-3d bg-card text-foreground shadow-[0_1px_2px_hsl(0_0%_0%/0.14),0_0_0_0.5px_hsl(0_0%_0%/0.05)]"
-          : "text-muted-foreground hover:text-foreground",
+          ? "text-foreground dark:text-background bg-white dark:bg-white"
+          : "text-muted-foreground hover:bg-background/60 hover:text-foreground dark:hover:bg-card",
       )}
     >
       {children}

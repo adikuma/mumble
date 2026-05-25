@@ -14,8 +14,9 @@
       {
         "label": "main",
         "title": "Mumble",
-        "width": 960,
-        "height": 640,
+        "width": 1200,
+        "height": 900,
+        "center": true,
         "minWidth": 720,
         "minHeight": 480,
         "resizable": true,

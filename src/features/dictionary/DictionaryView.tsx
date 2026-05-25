@@ -1,5 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Plus, ArrowRight, X } from "lucide-react";
+import { Page, PageHeader, Surface } from "@/components/kit/layout";
 import { SearchBar } from "@/components/kit/search-bar";
 import { DictRow } from "@/features/dictionary/dict-row";
 import {
@@ -55,25 +56,21 @@ export function DictionaryView() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-[880px] px-9 pb-9">
-      <div className="sticky top-0 z-10 -mx-9 px-9 pt-9 pb-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
-            Dictionary
-          </h1>
+    <Page>
+      <PageHeader
+        title="Dictionary"
+        description="Words Mumble should always spell your way. It learns from your edits too."
+        actions={
           <button
             onClick={() => (adding ? cancel() : setAdding(true))}
-            className="bg-card/68 surface-3d surface-3d-accent flex items-center gap-2 rounded-[8px] px-4 py-2.5 text-sm font-semibold text-[hsl(30_88%_42%)] backdrop-blur-md dark:text-[hsl(250_92%_80%)]"
+            title={adding ? "Cancel" : "Add new"}
+            aria-label={adding ? "Cancel" : "Add new"}
+            className="border-border bg-background text-foreground hover:bg-card flex size-10 items-center justify-center rounded-[8px] border transition-colors"
           >
             <Plus className="size-4" />
-            Add new
           </button>
-        </div>
-        <p className="text-muted-foreground mt-1.5 text-sm">
-          Words Mumble should always spell your way. It learns from your edits
-          too.
-        </p>
-      </div>
+        }
+      />
 
       <div className="mt-5">
         <SearchBar
@@ -83,7 +80,7 @@ export function DictionaryView() {
         />
       </div>
 
-      <div className="bg-card/68 border-border surface-3d shadow-lift mt-4 overflow-hidden rounded-[13px] border backdrop-blur-md">
+      <Surface className="mt-4">
         {adding ? (
           <div className="border-border flex items-center gap-3.5 border-b px-4 py-3 text-sm">
             <input
@@ -105,7 +102,7 @@ export function DictionaryView() {
             <button
               onClick={add}
               disabled={!pattern.trim() || !replacement.trim()}
-              className="bg-foreground text-background rounded-md px-3 py-1 text-xs font-semibold disabled:opacity-40"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-40"
             >
               Add
             </button>
@@ -129,7 +126,7 @@ export function DictionaryView() {
             <DictRow key={e.id} entry={e} onDelete={remove} />
           ))
         )}
-      </div>
-    </div>
+      </Surface>
+    </Page>
   );
 }
