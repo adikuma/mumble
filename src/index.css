@@ -239,20 +239,16 @@ body.indicator-window #root {
  * from layout, color, and content, not from decorative backgrounds. */
 .panel-bg {
   background-color: hsl(var(--background));
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    hsl(var(--foreground) / 0.045) 1px,
-    transparent 0
-  );
-  background-size: 18px 18px;
+  background-image:
+    linear-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 .dark .panel-bg {
   background-color: hsl(var(--background));
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    hsl(var(--foreground) / 0.055) 1px,
-    transparent 0
-  );
+  background-image:
+    linear-gradient(hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--foreground) / 0.045) 1px, transparent 1px);
 }
 
 @layer utilities {

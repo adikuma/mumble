@@ -30,13 +30,13 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "bg-background border-border sticky top-0 z-10 -mx-9 border-b px-9 pt-9 pb-4",
+        "bg-background border-border sticky top-0 z-10 -mx-9 border-b px-9 pt-7 pb-3.5",
         className,
       )}
     >
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[30px] leading-tight font-semibold tracking-[-0.02em]">
+          <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.015em]">
             {title}
           </h1>
           {description ? (

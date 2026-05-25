@@ -14,7 +14,7 @@ Keep:
 - flat surfaces instead of glass, bevels, or heavy shadows
 - amber accent in light mode
 - purple accent in dark mode
-- subtle canvas pattern inside the main panel only
+- subtle checked line pattern inside the main panel only
 - visible borders for structure
 - consistent page widths and grid gaps
 
@@ -209,7 +209,7 @@ Ask: is this a measurement or a design decision? Measurements may be raw. Design
 
 ## Canvas Pattern
 
-The main panel may use a subtle token-driven dot/check pattern through `.panel-bg`.
+The main panel may use a subtle token-driven checked line pattern through `.panel-bg`.
 
 Rules:
 
@@ -241,4 +241,3 @@ Before accepting frontend changes:
 - Does the page align to the app grid?
 - Are controls visible, focusable, and consistent?
 - Does the feature file mostly describe product structure rather than styling glue?
-
