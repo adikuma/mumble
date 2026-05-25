@@ -2,6 +2,8 @@ import { useState, type ComponentType, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import { cn, formatRelative, formatDuration } from "@/lib/utils";
+import { Surface } from "@/components/kit/layout";
+import { Button } from "@/components/ui/button";
 import {
   copyTranscript,
   deleteTranscript,
@@ -24,15 +26,13 @@ interface Props {
 
 export function TranscriptAccordion({ transcripts, onChanged }: Props) {
   return (
-    <Accordion
-      type="single"
-      collapsible
-      className="bg-card border-border overflow-hidden rounded-[13px] border"
-    >
-      {transcripts.map((t) => (
-        <Row key={t.id} transcript={t} onChanged={onChanged} />
-      ))}
-    </Accordion>
+    <Surface>
+      <Accordion type="single" collapsible>
+        {transcripts.map((t) => (
+          <Row key={t.id} transcript={t} onChanged={onChanged} />
+        ))}
+      </Accordion>
+    </Surface>
   );
 }
 
@@ -128,18 +128,16 @@ function Row({
               className="border-border bg-background text-foreground focus:border-foreground w-full resize-y rounded-md border px-3 py-2 text-sm leading-relaxed outline-none"
             />
             <div className="mt-2 flex justify-end gap-2">
-              <button
+              <Button
                 onClick={() => setEditing(false)}
-                className="border-border hover:bg-accent rounded-md border px-3 py-1.5 text-xs font-medium"
+                variant="outline"
+                size="xs"
               >
                 Cancel
-              </button>
-              <button
-                onClick={saveEdit}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors"
-              >
+              </Button>
+              <Button onClick={saveEdit} size="xs">
                 Save
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -202,16 +200,17 @@ function ActButton({
   children: ReactNode;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
+      variant="outline"
+      size="xs"
       className={cn(
-        "border-border bg-background hover:bg-accent flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium",
         danger &&
           "hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-300",
       )}
     >
       <Icon className="size-3.5" />
       {children}
-    </button>
+    </Button>
   );
 }

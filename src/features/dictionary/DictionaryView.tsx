@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent } from "react";
 import { Plus, ArrowRight, X } from "lucide-react";
 import { Page, PageHeader, Surface } from "@/components/kit/layout";
 import { SearchBar } from "@/components/kit/search-bar";
+import { Button } from "@/components/ui/button";
 import { DictRow } from "@/features/dictionary/dict-row";
 import {
   listDictionary,
@@ -61,14 +62,16 @@ export function DictionaryView() {
         title="Dictionary"
         description="Words Mumble should always spell your way. It learns from your edits too."
         actions={
-          <button
+          <Button
             onClick={() => (adding ? cancel() : setAdding(true))}
             title={adding ? "Cancel" : "Add new"}
             aria-label={adding ? "Cancel" : "Add new"}
-            className="border-border bg-background text-foreground hover:bg-card flex size-10 items-center justify-center rounded-[8px] border transition-colors"
+            variant="outline"
+            size="icon-lg"
+            className="rounded-[8px]"
           >
             <Plus className="size-4" />
-          </button>
+          </Button>
         }
       />
 
@@ -99,20 +102,21 @@ export function DictionaryView() {
               placeholder="replace with"
               className="placeholder:text-muted-foreground/40 min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-normal"
             />
-            <button
+            <Button
               onClick={add}
               disabled={!pattern.trim() || !replacement.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-40"
+              size="xs"
             >
               Add
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={cancel}
               aria-label="Cancel"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              variant="ghost"
+              size="icon-xs"
             >
               <X className="size-4" />
-            </button>
+            </Button>
           </div>
         ) : null}
         {filtered.length === 0 && !adding ? (

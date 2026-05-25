@@ -87,6 +87,24 @@ export function SectionLabel({ children, className }: SectionLabelProps) {
   );
 }
 
+interface MetaLabelProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export function MetaLabel({ children, className }: MetaLabelProps) {
+  return (
+    <span
+      className={cn(
+        "text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 interface SettingSectionProps {
   title: ReactNode;
   children: ReactNode;

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { MetaLabel } from "@/components/kit/layout";
 
 interface StatCardProps {
   label: string;
@@ -32,9 +33,7 @@ export function StatCard({
             </span>
           ) : null}
         </div>
-        <div className="text-muted-foreground mt-2 text-[12px] font-semibold tracking-[0.07em] uppercase">
-          {label}
-        </div>
+        <MetaLabel className="mt-2 block">{label}</MetaLabel>
       </div>
       {children}
     </div>

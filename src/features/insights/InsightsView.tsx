@@ -10,7 +10,13 @@ import { useMumbleStore } from "@/store";
 import { StatCard } from "@/components/kit/stat-card";
 import { BarList } from "@/components/kit/bar-list";
 import { WpmGauge } from "@/components/kit/wpm-gauge";
-import { AppGrid, Page, PageHeader, Surface } from "@/components/kit/layout";
+import {
+  AppGrid,
+  MetaLabel,
+  Page,
+  PageHeader,
+  Surface,
+} from "@/components/kit/layout";
 import { AppIcon } from "@/features/history/AppIcon";
 import { avgWpmThisWeek } from "@/features/home/home-helpers";
 import {
@@ -116,9 +122,7 @@ export function InsightsView() {
           <div className="mb-4 flex items-center justify-between">
             <span className="text-base font-semibold">Top apps used</span>
             {topApps.length > 0 ? (
-              <span className="text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase">
-                top {topApps.length}
-              </span>
+              <MetaLabel>top {topApps.length}</MetaLabel>
             ) : null}
           </div>
           <TopApps
@@ -145,9 +149,7 @@ function MetricsStrip({
             className="border-border px-4 py-4 md:border-l first:md:border-l-0"
             data-index={index}
           >
-            <div className="text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase">
-              {item.label}
-            </div>
+            <MetaLabel className="block">{item.label}</MetaLabel>
             <div className="mt-2 text-2xl font-semibold tabular-nums">
               {item.value}
             </div>

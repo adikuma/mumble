@@ -9,7 +9,12 @@ import {
 import { listHistory } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
-import { Page, PageHeader, SectionLabel } from "@/components/kit/layout";
+import {
+  MetaLabel,
+  Page,
+  PageHeader,
+  SectionLabel,
+} from "@/components/kit/layout";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -96,9 +101,7 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase">
-        {label}
-      </div>
+      <MetaLabel>{label}</MetaLabel>
       <div className="mt-1.5 text-[24px] font-semibold tracking-[-0.01em] tabular-nums">
         {value}
         {unit ? (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -49,13 +50,14 @@ export function GeneralPanel() {
         desc="Hold to record, release to transcribe and paste."
       >
         <span className="kbd">{capturing ? "Press any key…" : hotkey}</span>
-        <button
+        <Button
           onClick={rebind}
           disabled={capturing}
-          className="border-border bg-card hover:bg-muted dark:hover:bg-secondary rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          variant="outline"
+          size="sm"
         >
           {capturing ? "Listening…" : "Change"}
-        </button>
+        </Button>
       </SettingRow>
       <SettingRow
         title="Auto-paste at cursor"
