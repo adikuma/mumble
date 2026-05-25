@@ -4,6 +4,7 @@ import { Copy, Pencil, Trash2 } from "lucide-react";
 import { cn, formatRelative, formatDuration } from "@/lib/utils";
 import { Surface } from "@/components/kit/layout";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   copyTranscript,
   deleteTranscript,
@@ -121,11 +122,10 @@ function Row({
       <AccordionContent className="px-4">
         {editing ? (
           <div onClick={(e) => e.stopPropagation()}>
-            <textarea
+            <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={3}
-              className="border-border bg-background text-foreground focus:border-foreground w-full resize-y rounded-md border px-3 py-2 text-sm leading-relaxed outline-none"
             />
             <div className="mt-2 flex justify-end gap-2">
               <Button

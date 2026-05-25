@@ -144,6 +144,8 @@ Rows must wrap safely on narrow windows. Controls should stay visible and not fo
 Use shared controls:
 
 - `Button` for generic buttons
+- `Input` for boxed or inline text entry
+- `Textarea` for multiline editing
 - `Switch` for binary settings
 - `Select` for option sets
 - `ThemeToggle` for theme selection

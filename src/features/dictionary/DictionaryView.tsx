@@ -3,6 +3,7 @@ import { Plus, ArrowRight, X } from "lucide-react";
 import { Page, PageHeader, Surface } from "@/components/kit/layout";
 import { SearchBar } from "@/components/kit/search-bar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DictRow } from "@/features/dictionary/dict-row";
 import {
   listDictionary,
@@ -86,21 +87,23 @@ export function DictionaryView() {
       <Surface className="mt-4">
         {adding ? (
           <div className="border-border flex items-center gap-3.5 border-b px-4 py-3 text-sm">
-            <input
+            <Input
+              variant="inline"
               autoFocus
               value={pattern}
               onChange={(e) => setPattern(e.target.value)}
               onKeyDown={onKey}
               placeholder="heard as"
-              className="text-muted-foreground placeholder:text-muted-foreground/40 w-[130px] min-w-[130px] bg-transparent outline-none"
+              className="text-muted-foreground w-[130px] min-w-[130px]"
             />
             <ArrowRight className="text-muted-foreground/60 size-4 shrink-0" />
-            <input
+            <Input
+              variant="inline"
               value={replacement}
               onChange={(e) => setReplacement(e.target.value)}
               onKeyDown={onKey}
               placeholder="replace with"
-              className="placeholder:text-muted-foreground/40 min-w-0 flex-1 bg-transparent font-semibold outline-none placeholder:font-normal"
+              className="flex-1 font-semibold placeholder:font-normal"
             />
             <Button
               onClick={add}
