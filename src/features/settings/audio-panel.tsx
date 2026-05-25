@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   isTauri,
   listInputDevices,
@@ -66,11 +67,7 @@ export function AudioPanel() {
         <span className="text-sm font-medium">
           {model?.name ?? "Parakeet-TDT v3"}
         </span>
-        {model?.present ? (
-          <span className="rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-400">
-            Loaded
-          </span>
-        ) : null}
+        {model?.present ? <Badge variant="success">Loaded</Badge> : null}
       </SettingRow>
     </SettingSection>
   );

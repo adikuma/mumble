@@ -1,4 +1,5 @@
 import { ArrowRight, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { DictEntry } from "@/lib/tauri";
 
 interface DictRowProps {
@@ -14,13 +15,15 @@ export function DictRow({ entry, onDelete }: DictRowProps) {
       </span>
       <ArrowRight className="text-muted-foreground/60 size-4 shrink-0" />
       <span className="truncate font-semibold">{entry.replacement}</span>
-      <button
+      <Button
         onClick={() => onDelete(entry.id)}
         aria-label="Delete entry"
-        className="text-muted-foreground hover:text-destructive ml-auto opacity-0 transition-opacity group-hover:opacity-100"
+        variant="ghost"
+        size="icon-xs"
+        className="hover:text-destructive ml-auto opacity-0 transition-opacity group-hover:opacity-100"
       >
         <X className="size-4" />
-      </button>
+      </Button>
     </div>
   );
 }

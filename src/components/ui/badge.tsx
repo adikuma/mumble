@@ -14,6 +14,8 @@ const badgeVariants = cva(
         outline:
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         muted: "bg-muted text-muted-foreground",
+        success:
+          "border-border bg-card text-foreground dark:bg-secondary dark:text-foreground",
         destructive: "bg-destructive text-white [a&]:hover:bg-destructive/90",
       },
     },

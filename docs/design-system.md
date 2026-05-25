@@ -148,6 +148,7 @@ Use shared controls:
 - `Select` for option sets
 - `ThemeToggle` for theme selection
 - `SearchBar` for page search
+- `Badge` for compact status labels
 
 Control rules:
 
