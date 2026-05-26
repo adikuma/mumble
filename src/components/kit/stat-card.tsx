@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { MetaLabel } from "@/components/kit/layout";
+import { MetaLabel, Surface } from "@/components/kit/layout";
 
 interface StatCardProps {
   label: string;
@@ -18,9 +18,9 @@ export function StatCard({
   children,
 }: StatCardProps) {
   return (
-    <div
+    <Surface
       className={cn(
-        "bg-card border-border flex min-h-[116px] items-center justify-between rounded-[13px] border p-5",
+        "flex min-h-[116px] items-center justify-between p-5",
         className,
       )}
     >
@@ -36,6 +36,6 @@ export function StatCard({
         <MetaLabel className="mt-2 block">{label}</MetaLabel>
       </div>
       {children}
-    </div>
+    </Surface>
   );
 }
