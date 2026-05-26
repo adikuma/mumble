@@ -16,7 +16,7 @@ import {
 } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
 import { SettingSection } from "@/components/kit/layout";
-import { SettingRow } from "@/features/settings/setting-row";
+import { SettingControl, SettingRow } from "@/features/settings/setting-row";
 import { useUpdateSettings } from "@/features/settings/use-update-settings";
 
 export function AudioPanel() {
@@ -46,9 +46,11 @@ export function AudioPanel() {
             update({ inputDevice: v === "default" ? null : v })
           }
         >
-          <SelectTrigger className="w-[220px]">
-            <SelectValue />
-          </SelectTrigger>
+          <SettingControl width="lg">
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+          </SettingControl>
           <SelectContent>
             <SelectItem value="default">System Default</SelectItem>
             {devices.map((d) => (

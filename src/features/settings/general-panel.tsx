@@ -13,7 +13,7 @@ import { captureHotkey, isTauri } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
 import { SettingSection } from "@/components/kit/layout";
-import { SettingRow } from "@/features/settings/setting-row";
+import { SettingControl, SettingRow } from "@/features/settings/setting-row";
 import { useUpdateSettings } from "@/features/settings/use-update-settings";
 
 export function GeneralPanel() {
@@ -85,9 +85,11 @@ export function GeneralPanel() {
           value={preRoll}
           onValueChange={(v) => update({ preRollMs: Number(v) })}
         >
-          <SelectTrigger className="w-[120px]">
-            <SelectValue />
-          </SelectTrigger>
+          <SettingControl width="sm">
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+          </SettingControl>
           <SelectContent>
             <SelectItem value="0">Off</SelectItem>
             <SelectItem value="250">250 ms</SelectItem>

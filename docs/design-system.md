@@ -125,12 +125,12 @@ Use page layout, typography, and data density for hierarchy before adding more c
 
 ## Settings
 
-Settings must use `SettingSection` and `SettingRow`.
+Settings must use `SettingSection`, `SettingRow`, and `SettingControl`.
 
 ```tsx
 <SettingSection title="Audio">
   <SettingRow title="Microphone" desc="Microphone used during recording.">
-    ...
+    <SettingControl width="lg">...</SettingControl>
   </SettingRow>
 </SettingSection>
 ```
@@ -138,6 +138,8 @@ Settings must use `SettingSection` and `SettingRow`.
 One settings section is one surface with divided rows. Do not make each row its own card.
 
 Rows must wrap safely on narrow windows. Controls should stay visible and not force text to overflow.
+
+Use `SettingControl` for responsive control widths instead of feature-specific fixed widths.
 
 ## Controls
 
