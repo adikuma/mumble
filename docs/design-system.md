@@ -123,6 +123,8 @@ Surface does not own shadows, bevels, glass, or blur.
 
 Use page layout, typography, and data density for hierarchy before adding more chrome.
 
+Generic UI primitives should also stay flat. Popovers, dialogs, menus, and sheets separate with borders and backdrop, not drop shadows.
+
 ## Settings
 
 Settings must use `SettingSection`, `SettingRow`, and `SettingControl`.
