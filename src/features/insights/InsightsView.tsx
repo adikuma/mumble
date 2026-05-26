@@ -150,7 +150,7 @@ function MetricsStrip({
             data-index={index}
           >
             <MetaLabel className="block">{item.label}</MetaLabel>
-            <div className="mt-2 text-2xl font-semibold tabular-nums">
+            <div className="text-metric mt-2 font-semibold tabular-nums">
               {item.value}
             </div>
           </div>

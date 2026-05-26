@@ -69,7 +69,7 @@ export function DictionaryView() {
             aria-label={adding ? "Cancel" : "Add new"}
             variant="outline"
             size="icon-lg"
-            className="rounded-[8px]"
+            className="rounded-lg"
           >
             <Plus className="size-4" />
           </Button>

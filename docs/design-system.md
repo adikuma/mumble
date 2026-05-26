@@ -52,7 +52,7 @@ Use semantic tokens first:
 Light mode:
 
 - `background` is the clean workspace
-- `card`, `muted`, and `sidebar` are warm neutral planes
+- `card`, `muted`, and `sidebar` are warm neutral planes with a subtle amber cast
 - `primary` is amber
 
 Dark mode:
@@ -175,6 +175,9 @@ Use the app type scale from `src/index.css`:
 - `text-sm`: body UI and row text
 - `text-base`: section headings inside surfaces
 - `text-lg`: compact emphasis
+- `text-title`: page titles through `PageHeader`
+- `text-stat`: primary stat values
+- `text-metric`: secondary metric values
 
 Named app text patterns are centralized in primitives:
 

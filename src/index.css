@@ -55,6 +55,9 @@
   --text-sm: 14px;
   --text-base: 16px;
   --text-lg: 20px;
+  --text-title: 26px;
+  --text-stat: 24px;
+  --text-metric: 20px;
 
   /* accordion expand and collapse, driven by radix content height. */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -90,36 +93,36 @@
   --background: 0 0% 98.5%;
   --foreground: 0 0% 9%;
 
-  --card: 42 20% 95%;
+  --card: 38 28% 94.5%;
   --card-foreground: 0 0% 9%;
 
-  --popover: 42 20% 95%;
+  --popover: 38 28% 94.5%;
   --popover-foreground: 240 10% 3.9%;
 
   --primary: 36 86% 58%;
   --primary-foreground: 30 45% 10%;
 
-  --secondary: 42 20% 95%;
+  --secondary: 38 28% 94.5%;
   --secondary-foreground: 240 5.9% 10%;
 
-  --muted: 42 18% 92%;
+  --muted: 36 26% 90.5%;
   --muted-foreground: 0 0% 38%;
 
-  --accent: 42 20% 95%;
+  --accent: 38 28% 94.5%;
   --accent-foreground: 0 0% 12%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 42 16% 84%;
-  --border-strong: 42 12% 74%;
-  --input: 42 16% 84%;
+  --border: 36 20% 82%;
+  --border-strong: 36 16% 72%;
+  --input: 36 20% 82%;
   --ring: 35 92% 52%;
 
-  --sidebar: 42 20% 95%;
+  --sidebar: 38 28% 94.5%;
   --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-border: 42 14% 84%;
-  --sidebar-accent: 42 18% 90%;
+  --sidebar-border: 36 20% 82%;
+  --sidebar-accent: 36 26% 90.5%;
   --sidebar-accent-foreground: 240 5.9% 10%;
   --sidebar-ring: 35 92% 52%;
 }

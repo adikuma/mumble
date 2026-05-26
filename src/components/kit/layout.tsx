@@ -30,15 +30,13 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "bg-background border-border sticky top-0 z-10 -mx-9 border-b px-9 pt-7 pb-3.5",
+        "bg-background border-border sticky top-0 z-10 -mx-9 border-b px-9 pt-6 pb-3",
         className,
       )}
     >
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.015em]">
-            {title}
-          </h1>
+          <h1 className="text-title leading-tight font-semibold">{title}</h1>
           {description ? (
             <p className="text-muted-foreground mt-1.5 text-sm">
               {description}
@@ -60,7 +58,7 @@ export function Surface({ children, className }: SurfaceProps) {
   return (
     <div
       className={cn(
-        "bg-card border-border overflow-hidden rounded-[13px] border",
+        "bg-card border-border overflow-hidden rounded-xl border",
         className,
       )}
     >
@@ -78,7 +76,7 @@ export function SectionLabel({ children, className }: SectionLabelProps) {
   return (
     <h2
       className={cn(
-        "text-muted-foreground mb-3 text-[12px] font-semibold tracking-[0.07em] uppercase",
+        "text-muted-foreground mb-3 text-xs font-semibold tracking-[0.07em] uppercase",
         className,
       )}
     >
@@ -96,7 +94,7 @@ export function MetaLabel({ children, className }: MetaLabelProps) {
   return (
     <span
       className={cn(
-        "text-muted-foreground text-[12px] font-semibold tracking-[0.07em] uppercase",
+        "text-muted-foreground text-xs font-semibold tracking-[0.07em] uppercase",
         className,
       )}
     >

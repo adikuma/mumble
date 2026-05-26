@@ -60,9 +60,7 @@ export function Sidebar({
       <div className="flex items-center gap-2.5 px-2 py-1.5">
         <Logo size={28} />
         {!collapsed ? (
-          <span className="text-[20px] font-semibold tracking-[-0.01em]">
-            Mumble
-          </span>
+          <span className="text-lg font-semibold">Mumble</span>
         ) : null}
       </div>
       <nav className="mt-4 flex flex-col gap-1">
@@ -108,7 +106,7 @@ function NavButton({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex w-full items-center gap-3 rounded-[8px] px-2.5 py-2.5 text-sm font-medium transition-colors",
+        "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors",
         collapsed && "justify-center",
         active
           ? "bg-background text-foreground dark:bg-sidebar-accent font-semibold"

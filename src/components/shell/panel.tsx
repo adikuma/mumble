@@ -33,7 +33,7 @@ export function Panel({
           />
         </button>
       ) : null}
-      <div className="bg-background border-sidebar-border relative h-full overflow-hidden rounded-[16px] border">
+      <div className="bg-background border-sidebar-border relative h-full overflow-hidden rounded-2xl border">
         <div className="panel-bg pointer-events-none absolute inset-0" />
         <div className="relative h-full overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:hidden">
           {children}

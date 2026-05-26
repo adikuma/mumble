@@ -20,7 +20,7 @@ export function ThemeToggle() {
       : theme;
 
   return (
-    <div className="bg-muted border-border flex h-7 items-center gap-0.5 rounded-[8px] border p-[2px]">
+    <div className="bg-muted border-border flex h-7 items-center gap-0.5 rounded-lg border p-0.5">
       <Cell
         active={effective === "light"}
         onClick={() => setTheme("light")}

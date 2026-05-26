@@ -25,7 +25,7 @@ export function StatCard({
       )}
     >
       <div className="min-w-0">
-        <div className="text-3xl leading-none font-semibold tracking-[-0.02em] tabular-nums">
+        <div className="text-stat leading-none font-semibold tabular-nums">
           {value}
           {unit ? (
             <span className="text-muted-foreground ml-1 text-sm font-normal">

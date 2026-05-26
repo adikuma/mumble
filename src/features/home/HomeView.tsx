@@ -102,7 +102,7 @@ function Stat({
   return (
     <div>
       <MetaLabel>{label}</MetaLabel>
-      <div className="mt-1.5 text-[24px] font-semibold tracking-[-0.01em] tabular-nums">
+      <div className="text-stat mt-1.5 font-semibold tabular-nums">
         {value}
         {unit ? (
           <span className="text-muted-foreground ml-0.5 text-sm font-normal">

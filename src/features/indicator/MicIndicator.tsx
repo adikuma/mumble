@@ -22,6 +22,7 @@ interface MicIndicatorProps {
  * body, a glowing record dot, an indigo waveform, and a tabular timer.
  *
  *   * state === "recording" renders the dot, rms driven waveform, and timer.
+ *   * state === "idle" keeps the same waveform/timer layout at rest.
  *   * state === "transcribing" renders an indigo spinner and "Transcribing…".
  *   * state === "pasting" renders an indigo spinner and "Pasting…".
  *
@@ -76,45 +77,6 @@ function dividerColor(variant: "light" | "dark") {
   return variant === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
 }
 
-// rms level that counts as the user having started speaking. the live meter
-// reports raw input rms, where speech sits around 0.02 and up.
-const SPEECH_RMS_THRESHOLD = 0.02;
-
-// detects the first moment the user actually speaks after recording starts so
-// the pill can show a clear speak now cue and only reveal the live waveform
-// once your voice crosses the meter. resets when recording stops.
-function useSpeechDetected(active: boolean): boolean {
-  const [spoken, setSpoken] = useState(false);
-
-  useEffect(() => {
-    if (!active) return;
-
-    // browser dev has no real meter. reveal the waveform after a beat so the
-    // preview still animates.
-    if (!isTauri()) {
-      const id = setTimeout(() => setSpoken(true), 600);
-      return () => {
-        clearTimeout(id);
-        setSpoken(false);
-      };
-    }
-
-    const id = setInterval(() => {
-      getMeter()
-        .then((rms) => {
-          if (rms > SPEECH_RMS_THRESHOLD) setSpoken(true);
-        })
-        .catch(() => {});
-    }, 50);
-    return () => {
-      clearInterval(id);
-      setSpoken(false);
-    };
-  }, [active]);
-
-  return spoken;
-}
-
 function RecordingPill({
   variant,
   bars,
@@ -124,7 +86,6 @@ function RecordingPill({
   bars: number;
   active: boolean;
 }) {
-  const spoken = useSpeechDetected(active);
   return (
     <div className={pillClasses()} style={pillStyle(variant)}>
       <span
@@ -137,16 +98,7 @@ function RecordingPill({
               : "0 0 0 4px rgba(239,68,68,0.14)",
         }}
       />
-      {active && !spoken ? (
-        <span
-          className="shrink-0 text-[13px] font-medium tracking-tight"
-          style={{ opacity: 0.85 }}
-        >
-          Speak now
-        </span>
-      ) : (
-        <Waveform active={active} variant={variant} bars={bars} />
-      )}
+      <Waveform active={active} variant={variant} bars={bars} />
       <span
         className="h-[15px] w-px shrink-0"
         style={{ background: dividerColor(variant) }}
