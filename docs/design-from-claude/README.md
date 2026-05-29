@@ -1,3 +1,11 @@
+# Archived Claude Design Export
+
+This directory is historical reference material from an earlier design pass. It is not the source of truth for the current frontend.
+
+For current implementation rules, use [`../design-system.md`](../design-system.md). If anything here conflicts with that document or the live code in `src/`, the current design system wins.
+
+---
+
 # Mumble Design System
 
 A design system for **Mumble**, a Windows desktop push-to-talk voice dictation app. The user holds a global hotkey, speaks, releases — the transcript pastes into whatever app has focus. All transcription runs on-device. The app is invisible 99% of the time and lives in the system tray.

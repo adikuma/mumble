@@ -125,6 +125,22 @@ Use page layout, typography, and data density for hierarchy before adding more c
 
 Generic UI primitives should also stay flat. Popovers, dialogs, menus, and sheets separate with borders and backdrop, not drop shadows.
 
+## Lists
+
+Use `ListRow`, `ListMeta`, and `ListChip` for repeated rows inside surfaces.
+
+```tsx
+<Surface>
+  <ListRow>
+    <ListMeta>Yesterday</ListMeta>
+    <span className="min-w-0 flex-1 truncate">Transcript text</span>
+    <ListChip>0:04</ListChip>
+  </ListRow>
+</Surface>
+```
+
+List primitives own row dividers, padding, metadata color, and compact chip styling. Feature code should provide content and layout-specific columns only.
+
 ## Settings
 
 Settings must use `SettingSection`, `SettingRow`, and `SettingControl`.
