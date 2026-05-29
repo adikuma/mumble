@@ -1,5 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Plus, ArrowRight, X } from "lucide-react";
+import { ListRow } from "@/components/kit/list";
 import { Page, PageHeader, Surface } from "@/components/kit/layout";
 import { SearchBar } from "@/components/kit/search-bar";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export function DictionaryView() {
 
       <Surface className="mt-4">
         {adding ? (
-          <div className="border-border flex items-center gap-3.5 border-b px-4 py-3 text-sm">
+          <ListRow className="py-3">
             <Input
               variant="inline"
               autoFocus
@@ -120,7 +121,7 @@ export function DictionaryView() {
             >
               <X className="size-4" />
             </Button>
-          </div>
+          </ListRow>
         ) : null}
         {filtered.length === 0 && !adding ? (
           <p className="text-muted-foreground py-10 text-center text-sm">

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import { cn, formatRelative, formatDuration } from "@/lib/utils";
 import { Surface } from "@/components/kit/layout";
+import { ListChip, ListMeta } from "@/components/kit/list";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -95,13 +96,13 @@ function Row({
     <AccordionItem value={transcript.id} className="border-border">
       <AccordionTrigger className="w-full min-w-0 items-center px-4 py-3.5 hover:no-underline">
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          <span className="text-muted-foreground w-[66px] shrink-0 text-xs tabular-nums">
+          <ListMeta className="w-[66px]">
             {formatRelative(transcript.createdAt)}
-          </span>
+          </ListMeta>
           <span className="min-w-0 flex-1 truncate text-sm">
             <HighlightedText text={transcript.text} words={highlight} />
           </span>
-          <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs">
+          <ListMeta className="flex items-center gap-2">
             {transcript.targetApp ? (
               <>
                 <AppIcon
@@ -113,10 +114,8 @@ function Row({
                 </span>
               </>
             ) : null}
-            <span className="bg-muted rounded-[6px] px-2 py-0.5 tabular-nums">
-              {formatDuration(transcript.durationSec)}
-            </span>
-          </span>
+            <ListChip>{formatDuration(transcript.durationSec)}</ListChip>
+          </ListMeta>
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-4">

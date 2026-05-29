@@ -1,4 +1,5 @@
 import { ArrowRight, X } from "lucide-react";
+import { ListRow } from "@/components/kit/list";
 import { Button } from "@/components/ui/button";
 import type { DictEntry } from "@/lib/tauri";
 
@@ -9,7 +10,7 @@ interface DictRowProps {
 
 export function DictRow({ entry, onDelete }: DictRowProps) {
   return (
-    <div className="border-border group flex items-center gap-3.5 border-b px-4 py-4 text-sm last:border-b-0">
+    <ListRow>
       <span className="text-muted-foreground min-w-[130px] truncate">
         {entry.pattern}
       </span>
@@ -24,6 +25,6 @@ export function DictRow({ entry, onDelete }: DictRowProps) {
       >
         <X className="size-4" />
       </Button>
-    </div>
+    </ListRow>
   );
 }
