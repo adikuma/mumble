@@ -1,12 +1,13 @@
 [package]
-name = "mumble-scaffold"
+name = "mumble"
 version = "0.1.0"
 description = "Mumble — Hex-style voice dictation for Windows"
-authors = ["you"]
+authors = ["Aditya Kumar <aditya.kumar@getsolar.ai>"]
+license = "Apache-2.0"
 edition = "2021"
 
 [lib]
-name = "mumble_scaffold_lib"
+name = "mumble_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -28,27 +29,40 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 parking_lot = "0.12"
 crossbeam-channel = "0.5"
+# lock-free spsc ring used by the audio capture worker. lets the cpal
+# callback push samples without acquiring any contended lock.
+rtrb = "0.3"
 
 # --- Errors / logging ---
 anyhow = "1"
-thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # --- Filesystem / paths ---
 dirs = "5"
-directories = "5"
+
+# --- Identifiers ---
+# uuid v4 powers the transcript id generator. random ids avoid the
+# wallclock collision risk of the previous monotonic nanos format.
+uuid = { version = "1", features = ["v4"] }
+
+# --- Bounded cache ---
+lru = "0.12"
 
 # --- History persistence ---
 rusqlite = { version = "0.31", features = ["bundled"] }
 
 # --- Clipboard + keystroke injection ---
+# keystroke injection (ctrl+v) is done with raw `SendInput` from the
+# `windows` crate. enigo was previously used for this and has been dropped
+# because the scancode based send is faster, has no allocator path, and
+# matches the dependency surface hex uses on macos.
 arboard = "3"
-enigo = "0.2"
 
 # --- Downloads ---
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 futures-util = "0.3"
+sha2 = "0.10"
 
 # --- Time ---
 chrono = { version = "0.4", features = ["serde"] }
@@ -59,7 +73,6 @@ miniz_oxide = "0.8"
 
 # --- Audio capture (cross-platform; uses WASAPI on Windows) ---
 cpal = "0.15"
-hound = "3.5"  # WAV writer
 
 # --- Global hotkey (key-down / key-up events for push-to-talk) ---
 rdev = "0.5"
@@ -73,7 +86,9 @@ sherpa-rs = { version = "0.6", default-features = false, features = ["directml"]
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
-    "Win32_System_Registry",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_Com",
+    "Win32_System_DataExchange",
     "Win32_System_Threading",
     "Win32_Media_Audio",
     "Win32_UI_Shell",
