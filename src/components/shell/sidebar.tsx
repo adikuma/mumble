@@ -1,9 +1,10 @@
 import type { ComponentType } from "react";
 import { Home, BarChart3, BookText, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
+import type { Page } from "@/components/shell/routes";
 import { cn } from "@/lib/utils";
 
-export type Page = "home" | "insights" | "dictionary" | "settings";
+export type { Page };
 
 type IconType = ComponentType<{ className?: string; strokeWidth?: number }>;
 

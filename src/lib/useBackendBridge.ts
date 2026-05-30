@@ -3,11 +3,7 @@ import {
   getSettings,
   isTauri,
   listHistory,
-  onDownloadProgress,
-  onError,
-  onReady,
   onSettingsChanged,
-  onStateChanged,
   onTranscribed,
 } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
@@ -17,15 +13,6 @@ import { useMumbleStore } from "@/store";
  * mount once, at the top of the main window.
  */
 export function useBackendBridge() {
-  const setAppState = useMumbleStore((s) => s.setAppState);
-  const setModelReady = useMumbleStore((s) => s.setModelReady);
-  const setError = useMumbleStore((s) => s.setError);
-  const setSettings = useMumbleStore((s) => s.setSettings);
-  const setTranscripts = useMumbleStore((s) => s.setTranscripts);
-  const addTranscript = useMumbleStore((s) => s.addTranscript);
-  const setDownload = useMumbleStore((s) => s.setDownload);
-  const setHistoryLoading = useMumbleStore((s) => s.setHistoryLoading);
-
   useEffect(() => {
     if (!isTauri()) return;
 
@@ -35,19 +22,16 @@ export function useBackendBridge() {
     (async () => {
       try {
         const settings = await getSettings();
-        if (!cancelled) setSettings(settings);
+        if (!cancelled) useMumbleStore.setState({ settings });
       } catch (err) {
-        if (!cancelled) setError((err as Error).message ?? String(err));
+        console.error("getSettings failed", err);
       }
 
       try {
-        setHistoryLoading(true);
         const list = await listHistory();
-        if (!cancelled) setTranscripts(list);
+        if (!cancelled) useMumbleStore.setState({ transcripts: list });
       } catch (err) {
-        if (!cancelled) setError((err as Error).message ?? String(err));
-      } finally {
-        if (!cancelled) setHistoryLoading(false);
+        console.error("listHistory failed", err);
       }
 
       // listeners register after awaits. if the effect was cleaned up during
@@ -60,33 +44,28 @@ export function useBackendBridge() {
         else unlisteners.push(u);
       };
 
-      guard(await onStateChanged((e) => setAppState(e.state)));
-      guard(await onTranscribed((e) => addTranscript(e.transcript)));
-      guard(await onError((e) => setError(e.message)));
       guard(
-        await onReady((e) => {
-          setModelReady(e.ready);
-          setDownload(null);
-        }),
-      );
-      guard(
-        await onDownloadProgress((e) => {
-          setDownload(
-            e.done
-              ? null
-              : {
-                  filename: e.filename,
-                  downloaded: e.downloaded,
-                  total: e.total,
-                },
-          );
+        await onTranscribed((e) => {
+          useMumbleStore.getState().addTranscript(e.transcript);
         }),
       );
       guard(
         await onSettingsChanged((patch) => {
-          useMumbleStore.setState((s) =>
-            s.settings ? { settings: { ...s.settings, ...patch } } : {},
-          );
+          const current = useMumbleStore.getState().settings;
+          if (current) {
+            useMumbleStore.setState({ settings: { ...current, ...patch } });
+            return;
+          }
+          // settings have not loaded yet. fetch the full payload so the patch
+          // is not dropped on the floor.
+          getSettings()
+            .then((next) => {
+              if (cancelled) return;
+              useMumbleStore.setState({ settings: { ...next, ...patch } });
+            })
+            .catch((err) => {
+              console.error("getSettings refetch failed", err);
+            });
         }),
       );
     })();
@@ -95,14 +74,5 @@ export function useBackendBridge() {
       cancelled = true;
       unlisteners.forEach((u) => u());
     };
-  }, [
-    addTranscript,
-    setAppState,
-    setDownload,
-    setError,
-    setHistoryLoading,
-    setModelReady,
-    setSettings,
-    setTranscripts,
-  ]);
+  }, []);
 }

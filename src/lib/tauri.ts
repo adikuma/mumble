@@ -114,13 +114,8 @@ export const listHistory = (
 export const deleteTranscript = (id: string): Promise<void> =>
   safeInvoke("delete_transcript", { id });
 
-export const clearHistory = (): Promise<void> => safeInvoke("clear_history");
-
 export const copyTranscript = (id: string): Promise<void> =>
   safeInvoke("copy_transcript", { id });
-
-export const repasteTranscript = (id: string): Promise<void> =>
-  safeInvoke("repaste_transcript", { id });
 
 export const updateTranscript = (
   id: string,
@@ -143,41 +138,17 @@ export const addDictionaryEntry = (
     fuzzy,
   });
 
-export const updateDictionaryEntry = (
-  id: number,
-  pattern: string,
-  replacement: string,
-  caseSensitive: boolean,
-  fuzzy: boolean,
-): Promise<void> =>
-  safeInvoke("update_dictionary_entry", {
-    id,
-    pattern,
-    replacement,
-    caseSensitive,
-    fuzzy,
-  });
-
 export const deleteDictionaryEntry = (id: number): Promise<void> =>
   safeInvoke("delete_dictionary_entry", { id });
 
-export const hideMainWindow = (): Promise<void> =>
-  safeInvoke("hide_main_window");
-export const showMainWindow = (): Promise<void> =>
-  safeInvoke("show_main_window");
-
 export const modelStatus = (): Promise<ModelStatus> =>
   safeInvoke("model_status");
-export const redownloadModel = (): Promise<void> =>
-  safeInvoke("redownload_model");
 
 export const getInsights = (rangeDays = 7): Promise<InsightsData> =>
   safeInvoke("get_insights", { rangeDays });
 
-export const getAppIcon = async (exePath: string): Promise<string | null> => {
-  const result = await safeInvoke<string | null>("get_app_icon", { exePath });
-  return result ?? null;
-};
+export const getAppIcon = (exePath: string): Promise<string | null> =>
+  safeInvoke<string | null>("get_app_icon", { exePath });
 
 export interface StateChangedEvent {
   state: AppState;

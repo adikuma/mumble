@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { Sidebar, type Page } from "@/components/shell/sidebar";
+import { Sidebar } from "@/components/shell/sidebar";
+import type { Page } from "@/components/shell/routes";
 import { Topbar } from "@/components/shell/topbar";
 import { Panel } from "@/components/shell/panel";
 import { useWindowWidth } from "@/lib/use-window-width";
