@@ -17,7 +17,11 @@ export function AppIcon({ exePath, appName, size = 14 }: Props) {
   useEffect(() => {
     if (!exePath) return;
     if (icon !== undefined) return;
-    getAppIcon(exePath).then((url) => setAppIcon(exePath, url));
+    // on rejection (e.g. backend allowlist rejects the path) cache null so
+    // the fallback letter renders and we do not retry every paint.
+    getAppIcon(exePath)
+      .then((url) => setAppIcon(exePath, url))
+      .catch(() => setAppIcon(exePath, null));
   }, [exePath, icon, setAppIcon]);
 
   if (icon) {
