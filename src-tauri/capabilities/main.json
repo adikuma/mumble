@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Mumble main + indicator window capabilities",
-  "windows": ["main", "indicator"],
+  "identifier": "main",
+  "description": "Mumble main window capabilities",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -13,10 +13,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-is-maximized",
     "core:window:allow-close",
-    "core:window:allow-set-position",
     "core:window:allow-set-focus",
-    "core:window:allow-set-ignore-cursor-events",
-    "core:window:allow-set-always-on-top",
     "core:webview:allow-webview-show",
     "core:webview:allow-webview-hide",
     "core:event:allow-listen",
