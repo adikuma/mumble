@@ -1,11 +1,18 @@
-import { useState, type ComponentType, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
 import { Copy, Pencil, Trash2 } from "lucide-react";
-import { cn, formatRelative, formatDuration } from "@/lib/utils";
+import { formatDuration } from "@/lib/utils";
 import { Surface } from "@/components/kit/layout";
 import { ListChip, ListMeta } from "@/components/kit/list";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useNow } from "@/lib/use-now";
 import {
   copyTranscript,
   deleteTranscript,
@@ -13,7 +20,7 @@ import {
   addDictionaryEntry,
   type Transcript,
 } from "@/lib/tauri";
-import { AppIcon } from "@/features/history/AppIcon";
+import { AppIcon } from "@/components/kit/app-icon";
 import {
   Accordion,
   AccordionContent,
@@ -27,27 +34,58 @@ interface Props {
 }
 
 export function TranscriptAccordion({ transcripts, onChanged }: Props) {
+  // tick once a minute so relative labels age without reading date.now() at
+  // render time. all rows share the same now to keep render pure.
+  const now = useNow(60_000);
   return (
     <Surface>
       <Accordion type="single" collapsible>
         {transcripts.map((t) => (
-          <Row key={t.id} transcript={t} onChanged={onChanged} />
+          <Row key={t.id} transcript={t} now={now} onChanged={onChanged} />
         ))}
       </Accordion>
     </Surface>
   );
 }
 
+function formatRelativeFrom(iso: string, now: number): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const diffSec = Math.max(0, Math.round((now - then) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const mins = Math.round(diffSec / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? "Yesterday" : `${days} days ago`;
+}
+
 function Row({
   transcript,
+  now,
   onChanged,
 }: {
   transcript: Transcript;
+  now: number;
   onChanged?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState(transcript.text);
   const [highlight, setHighlight] = useState<string[]>([]);
+  const highlightTimer = useRef<number | null>(null);
+
+  // clear the pending highlight clear on unmount so a late timer never fires
+  // against a dead component.
+  useEffect(() => {
+    return () => {
+      if (highlightTimer.current != null) {
+        clearTimeout(highlightTimer.current);
+        highlightTimer.current = null;
+      }
+    };
+  }, []);
 
   async function handleCopy() {
     await copyTranscript(transcript.id);
@@ -67,12 +105,21 @@ function Row({
 
   async function saveEdit() {
     const next = draft.trim();
-    setEditing(false);
-    if (next === transcript.text) return;
+    if (next === transcript.text) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
     try {
       const corrections = await updateTranscript(transcript.id, next);
       setHighlight(corrections.map((c) => c.corrected));
-      setTimeout(() => setHighlight([]), 1800);
+      if (highlightTimer.current != null) {
+        clearTimeout(highlightTimer.current);
+      }
+      highlightTimer.current = window.setTimeout(() => {
+        setHighlight([]);
+        highlightTimer.current = null;
+      }, 1800);
       for (const c of corrections) {
         toast("Learned a correction", {
           description: `${c.original} becomes ${c.corrected}`,
@@ -86,9 +133,13 @@ function Row({
           },
         });
       }
+      setEditing(false);
       onChanged?.();
     } catch (err) {
+      // leave editing=true and the draft intact so the user can retry.
       toast.error(`Save failed: ${(err as Error).message}`);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -97,7 +148,7 @@ function Row({
       <AccordionTrigger className="w-full min-w-0 items-center px-4 py-3.5 hover:no-underline">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <ListMeta className="w-[66px]">
-            {formatRelative(transcript.createdAt)}
+            {formatRelativeFrom(transcript.createdAt, now)}
           </ListMeta>
           <span className="min-w-0 flex-1 truncate text-sm">
             <HighlightedText text={transcript.text} words={highlight} />
@@ -125,17 +176,19 @@ function Row({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={3}
+              disabled={saving}
             />
             <div className="mt-2 flex justify-end gap-2">
               <Button
                 onClick={() => setEditing(false)}
                 variant="outline"
                 size="xs"
+                disabled={saving}
               >
                 Cancel
               </Button>
-              <Button onClick={saveEdit} size="xs">
-                Save
+              <Button onClick={saveEdit} size="xs" disabled={saving}>
+                {saving ? "Saving…" : "Save"}
               </Button>
             </div>
           </div>
@@ -201,12 +254,8 @@ function ActButton({
   return (
     <Button
       onClick={onClick}
-      variant="outline"
+      variant={danger ? "destructive-outline" : "outline"}
       size="xs"
-      className={cn(
-        danger &&
-          "hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-300",
-      )}
     >
       <Icon className="size-3.5" />
       {children}

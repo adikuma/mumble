@@ -1,12 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { TranscriptAccordion } from "@/features/home/TranscriptAccordion";
-import { groupByRecency } from "@/features/history/group-helpers";
-import {
-  wordsToday,
-  avgWpmThisWeek,
-  currentStreakDays,
-} from "@/features/home/home-helpers";
-import { listHistory } from "@/lib/tauri";
+import { groupByRecency } from "@/lib/transcripts";
+import { wordsToday, avgWpmThisWeek, currentStreakDays } from "@/lib/stats";
+import { isTauri, listHistory } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
 import {
@@ -29,9 +26,10 @@ export function HomeView() {
   const setTranscripts = useMumbleStore((s) => s.setTranscripts);
   const settings = useMumbleStore((s) => s.settings);
 
-  useEffect(() => {
-    listHistory().then(setTranscripts);
-  }, [setTranscripts]);
+  // capture the greeting once on mount so render stays pure across rerenders.
+  // the bridge already loads history on mount, so home only refreshes after
+  // local edits via refresh().
+  const [hello] = useState<string>(() => greeting());
 
   const groups = useMemo(() => groupByRecency(transcripts), [transcripts]);
   const stats = useMemo(
@@ -45,13 +43,18 @@ export function HomeView() {
   const hotkey = formatHotkey(settings?.hotkey ?? "Right Alt");
 
   async function refresh() {
-    setTranscripts(await listHistory());
+    if (!isTauri()) return;
+    try {
+      setTranscripts(await listHistory());
+    } catch (err) {
+      toast.error(`Refresh failed: ${(err as Error).message}`);
+    }
   }
 
   return (
     <Page>
       <PageHeader
-        title={greeting()}
+        title={hello}
         description={
           <>
             Hold <span className="kbd">{hotkey}</span> to dictate.

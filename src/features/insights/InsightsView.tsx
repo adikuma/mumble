@@ -17,8 +17,8 @@ import {
   PageHeader,
   Surface,
 } from "@/components/kit/layout";
-import { AppIcon } from "@/features/history/AppIcon";
-import { avgWpmThisWeek } from "@/features/home/home-helpers";
+import { AppIcon } from "@/components/kit/app-icon";
+import { avgWpmThisWeek } from "@/lib/stats";
 import {
   topPastedApps,
   type PastedApp,
@@ -54,7 +54,7 @@ export function InsightsView() {
     getInsights(HEATMAP_DAYS)
       .then((d) => setHeat(d.dailyActivity))
       .catch(() => setHeat([]));
-  }, [transcripts.length]);
+  }, [transcripts]);
 
   const empty = !data || data.sessions === 0;
   const wpm = useMemo(() => avgWpmThisWeek(transcripts), [transcripts]);
@@ -241,7 +241,8 @@ function Heatmap({ days }: { days: DailyBucket[] }) {
 
   const cells: (DailyBucket | null)[] = [];
   if (days.length > 0) {
-    const firstDow = new Date(days[0].day + "T00:00:00").getDay();
+    // parse the day key as utc so the leading offset is timezone-stable.
+    const firstDow = new Date(days[0].day + "T00:00:00Z").getUTCDay();
     for (let i = 0; i < firstDow; i += 1) cells.push(null);
   }
   for (const d of days) cells.push(d);

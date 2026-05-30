@@ -1,4 +1,5 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { toast } from "sonner";
 import { Plus, ArrowRight, X } from "lucide-react";
 import { ListRow } from "@/components/kit/list";
 import { Page, PageHeader, Surface } from "@/components/kit/layout";
@@ -30,9 +31,13 @@ export function DictionaryView() {
     const p = pattern.trim();
     const r = replacement.trim();
     if (!p || !r) return;
-    const entry = await addDictionaryEntry(p, r);
-    setDict((d) => [entry, ...d.filter((e) => e.id !== entry.id)]);
-    cancel();
+    try {
+      const entry = await addDictionaryEntry(p, r);
+      setDict((d) => [entry, ...d.filter((e) => e.id !== entry.id)]);
+      cancel();
+    } catch (err) {
+      toast.error(`Add failed: ${(err as Error).message}`);
+    }
   }
 
   function cancel() {
@@ -47,16 +52,23 @@ export function DictionaryView() {
   }
 
   async function remove(id: number) {
-    await deleteDictionaryEntry(id);
-    setDict((d) => d.filter((e) => e.id !== id));
+    try {
+      await deleteDictionaryEntry(id);
+      setDict((d) => d.filter((e) => e.id !== id));
+    } catch (err) {
+      toast.error(`Delete failed: ${(err as Error).message}`);
+    }
   }
 
-  const q = query.toLowerCase();
-  const filtered = dict.filter(
-    (e) =>
-      e.pattern.toLowerCase().includes(q) ||
-      e.replacement.toLowerCase().includes(q),
-  );
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    if (!q) return dict;
+    return dict.filter(
+      (e) =>
+        e.pattern.toLowerCase().includes(q) ||
+        e.replacement.toLowerCase().includes(q),
+    );
+  }, [dict, query]);
 
   return (
     <Page>

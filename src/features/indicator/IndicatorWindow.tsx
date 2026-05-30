@@ -20,15 +20,7 @@ import { useTheme } from "@/components/theme-provider";
 export function IndicatorWindow() {
   const [state, setState] = useState<AppState>("idle");
   const [progress, setProgress] = useState<ChunkProgressEvent | null>(null);
-  const { theme } = useTheme();
-
-  const effectiveTheme: "light" | "dark" =
-    theme === "system"
-      ? typeof window !== "undefined" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : theme;
+  const { resolvedTheme } = useTheme();
 
   // make the indicator route's window itself transparent.
   useEffect(() => {
@@ -37,24 +29,31 @@ export function IndicatorWindow() {
   }, []);
 
   useEffect(() => {
-    let unlistenState: (() => void) | null = null;
-    let unlistenProgress: (() => void) | null = null;
-    onStateChanged((e) => {
-      setState(e.state);
-      // reset progress when the pipeline returns to idle so the next
-      // recording starts with a clean "Transcribing..." label.
-      if (e.state === "idle" || e.state === "recording") {
-        setProgress(null);
-      }
-    }).then((u) => {
-      unlistenState = u;
-    });
-    onChunkProgress((e) => setProgress(e)).then((u) => {
-      unlistenProgress = u;
-    });
+    let cancelled = false;
+    const unlisteners: Array<() => void> = [];
+    const guard = (u: () => void) => {
+      if (cancelled) u();
+      else unlisteners.push(u);
+    };
+
+    (async () => {
+      const stateUnlisten = await onStateChanged((e) => {
+        setState(e.state);
+        // reset progress when the pipeline returns to idle so the next
+        // recording starts with a clean "transcribing..." label.
+        if (e.state === "idle" || e.state === "recording") {
+          setProgress(null);
+        }
+      });
+      guard(stateUnlisten);
+
+      const progressUnlisten = await onChunkProgress((e) => setProgress(e));
+      guard(progressUnlisten);
+    })();
+
     return () => {
-      unlistenState?.();
-      unlistenProgress?.();
+      cancelled = true;
+      unlisteners.forEach((u) => u());
     };
   }, []);
 
@@ -63,11 +62,7 @@ export function IndicatorWindow() {
       className="flex h-screen w-screen items-center justify-center"
       style={{ fontFamily: "var(--font-sans)", background: "transparent" }}
     >
-      <MicIndicator
-        state={state}
-        variant={effectiveTheme}
-        progress={progress}
-      />
+      <MicIndicator state={state} variant={resolvedTheme} progress={progress} />
     </div>
   );
 }
