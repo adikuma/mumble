@@ -97,7 +97,13 @@ impl SettingsStore {
     fn persist(&self, s: &Settings) -> Result<()> {
         let path = paths::settings_path()?;
         let json = serde_json::to_string_pretty(s)?;
-        std::fs::write(&path, json).with_context(|| format!("write {}", path.display()))?;
+        // atomic write. dump the new json to a sibling tmp file, then rename
+        // over the destination. on windows this is durable so a crash mid
+        // write cannot leave settings.json half written.
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, json).with_context(|| format!("write {}", tmp.display()))?;
+        std::fs::rename(&tmp, &path)
+            .with_context(|| format!("rename {} to {}", tmp.display(), path.display()))?;
         Ok(())
     }
 }

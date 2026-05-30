@@ -1,6 +1,6 @@
 //! all `#[tauri::command]` handlers the frontend can invoke.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
@@ -10,7 +10,6 @@ use crate::dictionary::{Correction, DictEntry};
 use crate::history::{HistoryStore, InsightsData, Transcript};
 use crate::hotkey::HotkeyListener;
 use crate::model_download;
-use crate::paste;
 use crate::pipeline::Pipeline;
 use crate::settings::{Settings, SettingsStore};
 use crate::state::AppState;
@@ -19,6 +18,12 @@ fn err(e: anyhow::Error) -> String {
     format!("{e:#}")
 }
 
+// caps for user supplied strings. these protect the backend from
+// pathological inputs (e.g. a paste of a multi mb script into the dictionary
+// pattern field) without affecting typical usage.
+const TRANSCRIPT_MAX_BYTES: usize = 1_048_576;
+const DICT_FIELD_MAX_BYTES: usize = 1_024;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceInfo {
@@ -26,42 +31,91 @@ pub struct DeviceInfo {
     pub is_default: bool,
 }
 
+/// read the current `Settings` snapshot. side effect free. matches no emit.
 #[tauri::command]
 pub fn get_settings(store: State<'_, SettingsStore>) -> Settings {
     store.get()
 }
 
+/// strongly typed partial settings patch from the frontend. unknown fields
+/// are rejected so a typo cannot silently drop a field on the floor.
+///
+/// `input_device` uses double Option semantics: outer None means "field
+/// absent, do not touch", `Some(None)` means "explicitly null, clear the
+/// device override" and `Some(Some(...))` means "set to this device name".
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SettingsPatch {
+    pub hotkey: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_optional_string")]
+    pub input_device: Option<Option<String>>,
+    pub launch_at_login: Option<bool>,
+    pub start_minimized: Option<bool>,
+    pub theme: Option<String>,
+    pub paused: Option<bool>,
+    pub pre_roll_ms: Option<u32>,
+    pub auto_paste: Option<bool>,
+}
+
+// distinguish "absent" from "explicitly null" so the patch can both leave
+// input_device alone and reset it. without this, serde collapses both into
+// outer None and we lose the ability to clear an override.
+fn deserialize_optional_optional_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer).map(Some)
+}
+
+/// apply a partial `SettingsPatch` and return the merged `Settings`. side
+/// effects: persists settings.json, reconciles autostart with the os, rebinds
+/// the hotkey listener, and tears down the capture worker on input device
+/// change. tray broadcasts a `mumble://settings-changed` event after persist.
 #[tauri::command]
 pub fn update_settings(
     app: AppHandle,
     store: State<'_, SettingsStore>,
-    patch: serde_json::Value,
+    pipeline: State<'_, Arc<Pipeline>>,
+    patch: SettingsPatch,
 ) -> Result<Settings, String> {
+    // validate pre roll against the ring buffer ceiling so the frontend
+    // cannot ask for a value the capture worker silently clamps.
+    if let Some(v) = patch.pre_roll_ms {
+        let max_ms = (audio::RING_SECONDS * 1000.0) as u32;
+        if v > max_ms {
+            return Err(format!(
+                "preRollMs {v} exceeds ring buffer ceiling of {max_ms} ms"
+            ));
+        }
+    }
+
     let prev = store.get();
     let next = store
         .update(|s| {
-            if let Some(v) = patch.get("hotkey").and_then(|x| x.as_str()) {
-                s.hotkey = v.to_string();
+            if let Some(v) = patch.hotkey {
+                s.hotkey = v;
             }
-            if let Some(v) = patch.get("inputDevice") {
-                s.input_device = v.as_str().map(|x| x.to_string());
+            if let Some(v) = patch.input_device {
+                s.input_device = v;
             }
-            if let Some(v) = patch.get("launchAtLogin").and_then(|x| x.as_bool()) {
+            if let Some(v) = patch.launch_at_login {
                 s.launch_at_login = v;
             }
-            if let Some(v) = patch.get("startMinimized").and_then(|x| x.as_bool()) {
+            if let Some(v) = patch.start_minimized {
                 s.start_minimized = v;
             }
-            if let Some(v) = patch.get("theme").and_then(|x| x.as_str()) {
-                s.theme = v.to_string();
+            if let Some(v) = patch.theme {
+                s.theme = v;
             }
-            if let Some(v) = patch.get("paused").and_then(|x| x.as_bool()) {
+            if let Some(v) = patch.paused {
                 s.paused = v;
             }
-            if let Some(v) = patch.get("preRollMs").and_then(|x| x.as_u64()) {
-                s.pre_roll_ms = v as u32;
+            if let Some(v) = patch.pre_roll_ms {
+                s.pre_roll_ms = v;
             }
-            if let Some(v) = patch.get("autoPaste").and_then(|x| x.as_bool()) {
+            if let Some(v) = patch.auto_paste {
                 s.auto_paste = v;
             }
         })
@@ -87,9 +141,25 @@ pub fn update_settings(
         }
     }
 
+    // tear down the capture worker if the input device changed. the next
+    // hotkey press calls ensure_capture which builds a fresh worker on the
+    // new device. dropping the old worker sends shutdown to its thread.
+    if prev.input_device != next.input_device {
+        let mut guard = pipeline.capture.lock();
+        if guard.take().is_some() {
+            tracing::info!(
+                old = ?prev.input_device,
+                new = ?next.input_device,
+                "input device changed, tearing down capture worker"
+            );
+        }
+    }
+
     Ok(next)
 }
 
+/// enumerate available input devices via cpal and return name plus default
+/// flag for each. side effect free. matches no emit.
 #[tauri::command]
 pub fn list_input_devices() -> Result<Vec<DeviceInfo>, String> {
     audio::list_input_devices()
@@ -104,6 +174,10 @@ pub fn list_input_devices() -> Result<Vec<DeviceInfo>, String> {
         .map_err(err)
 }
 
+/// block until the next key press through the global hook and return its
+/// hotkey string form. used by the settings ui to capture a new binding.
+/// side effect: temporarily swallows one key press from the listener.
+/// matches no emit.
 #[tauri::command]
 pub fn capture_hotkey(listener: State<'_, HotkeyListener>) -> Result<String, String> {
     listener
@@ -111,16 +185,23 @@ pub fn capture_hotkey(listener: State<'_, HotkeyListener>) -> Result<String, Str
         .ok_or_else(|| "timed out waiting for key press".to_string())
 }
 
+/// read the current pipeline `AppState`. side effect free. matches the
+/// `mumble://state-changed` event the pipeline emits on every transition.
 #[tauri::command]
 pub fn get_state(pipeline: State<'_, Arc<Pipeline>>) -> AppState {
     pipeline.state.get()
 }
 
+/// poll the live audio level from the capture worker. returns 0.0 when no
+/// capture is active. side effect free. matches no emit (the indicator
+/// polls this on a timer).
 #[tauri::command]
 pub fn get_meter(pipeline: State<'_, Arc<Pipeline>>) -> f32 {
     pipeline.meter()
 }
 
+/// list transcripts ordered by recency, optionally filtered by a substring
+/// query. side effect free. matches no emit.
 #[tauri::command]
 pub fn list_history(
     history: State<'_, HistoryStore>,
@@ -132,16 +213,22 @@ pub fn list_history(
         .map_err(err)
 }
 
+/// delete one transcript by id. side effect: removes the row from
+/// history.db. matches no emit (the ui refreshes locally).
 #[tauri::command]
 pub fn delete_transcript(history: State<'_, HistoryStore>, id: String) -> Result<(), String> {
     history.delete(&id).map_err(err)
 }
 
+/// clear all transcripts. side effect: truncates the transcripts table.
+/// matches no emit.
 #[tauri::command]
 pub fn clear_history(history: State<'_, HistoryStore>) -> Result<(), String> {
     history.clear().map_err(err)
 }
 
+/// copy one transcript's text to the system clipboard. side effect: writes
+/// the clipboard via arboard. matches no emit.
 #[tauri::command]
 pub fn copy_transcript(history: State<'_, HistoryStore>, id: String) -> Result<(), String> {
     let transcript = history.get(&id).map_err(err)?;
@@ -153,15 +240,24 @@ pub fn copy_transcript(history: State<'_, HistoryStore>, id: String) -> Result<(
     Ok(())
 }
 
+/// re paste an existing transcript into the current foreground window.
+/// side effect: stages text on the clipboard and synthesises ctrl plus v
+/// through the paste worker. matches no emit.
 #[tauri::command]
-pub fn repaste_transcript(history: State<'_, HistoryStore>, id: String) -> Result<(), String> {
+pub fn repaste_transcript(
+    history: State<'_, HistoryStore>,
+    pipeline: State<'_, Arc<Pipeline>>,
+    id: String,
+) -> Result<(), String> {
     let transcript = history.get(&id).map_err(err)?;
     let Some(t) = transcript else {
         return Err("transcript not found".into());
     };
-    paste::paste_text(&t.text).map_err(err)
+    pipeline.paste_client.paste_text(&t.text).map_err(err)
 }
 
+/// hide the main webview window. side effect: window visibility flips off.
+/// matches no emit.
 #[tauri::command]
 pub fn hide_main_window(app: AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
@@ -169,6 +265,8 @@ pub fn hide_main_window(app: AppHandle) {
     }
 }
 
+/// show and focus the main webview window. side effect: window visibility
+/// and focus flip on. matches no emit.
 #[tauri::command]
 pub fn show_main_window(app: AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
@@ -177,6 +275,9 @@ pub fn show_main_window(app: AppHandle) {
     }
 }
 
+/// delete the cached model files and re fetch them from huggingface. side
+/// effect: writes the models directory. matches `mumble://download-progress`
+/// events emitted by `model_download` while bytes are streaming.
 #[tauri::command]
 pub async fn redownload_model(app: AppHandle) -> Result<(), String> {
     let dir = crate::paths::models_dir().map_err(err)?;
@@ -185,6 +286,8 @@ pub async fn redownload_model(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// describe whether the local model assets are present, plus their on disk
+/// path and the user facing model name. side effect free. matches no emit.
 #[tauri::command]
 pub fn model_status() -> Result<ModelStatus, String> {
     let dir = crate::paths::models_dir().map_err(err)?;
@@ -196,6 +299,8 @@ pub fn model_status() -> Result<ModelStatus, String> {
     })
 }
 
+/// aggregate transcripts into insights over the last `range_days` (default
+/// 7). side effect free. matches no emit.
 #[tauri::command]
 pub fn get_insights(
     history: State<'_, HistoryStore>,
@@ -204,12 +309,47 @@ pub fn get_insights(
     history.insights(range_days.unwrap_or(7)).map_err(err)
 }
 
+/// extract a base64 png icon for an executable on disk and cache it.
+/// rejects paths outside the windows install allowlist. side effect:
+/// populates the `IconCache`. matches no emit.
 #[tauri::command]
 pub fn get_app_icon(
     pipeline: State<'_, Arc<Pipeline>>,
     exe_path: String,
-) -> Option<String> {
-    pipeline.state.icon_cache.get_or_extract(&exe_path)
+) -> Result<Option<String>, String> {
+    if !is_allowed_exe_path(&exe_path) {
+        return Err("path not allowed".into());
+    }
+    Ok(pipeline.state.icon_cache.get_or_extract(&exe_path))
+}
+
+// only allow icon extraction for executables under known windows install
+// roots. blocks attempts to coerce shell32 into reading attacker controlled
+// paths or unc shares.
+fn is_allowed_exe_path(exe_path: &str) -> bool {
+    let normalized = exe_path.replace('/', "\\").to_ascii_lowercase();
+    let roots = allowed_exe_roots();
+    roots
+        .iter()
+        .any(|root| !root.is_empty() && normalized.starts_with(root))
+}
+
+fn allowed_exe_roots() -> Vec<String> {
+    let envs = ["ProgramFiles", "ProgramFiles(x86)", "SystemRoot", "AppData"];
+    let mut roots: Vec<String> = envs
+        .iter()
+        .filter_map(|name| std::env::var(name).ok())
+        .map(|v| v.replace('/', "\\").to_ascii_lowercase())
+        .collect();
+    if let Ok(local) = std::env::var("LocalAppData") {
+        let local = local.replace('/', "\\");
+        roots.push(format!("{}\\programs", local.to_ascii_lowercase()));
+        roots.push(format!(
+            "{}\\microsoft\\windowsapps",
+            local.to_ascii_lowercase()
+        ));
+    }
+    roots
 }
 
 #[derive(Serialize)]
@@ -220,11 +360,15 @@ pub struct ModelStatus {
     pub name: String,
 }
 
+/// list every dictionary entry in priority order. side effect free.
+/// matches no emit.
 #[tauri::command]
 pub fn list_dictionary(history: State<'_, HistoryStore>) -> Result<Vec<DictEntry>, String> {
     history.list_dictionary().map_err(err)
 }
 
+/// insert a new dictionary entry and return the created row. side effect:
+/// writes the dictionary table. matches no emit.
 #[tauri::command]
 pub fn add_dictionary_entry(
     history: State<'_, HistoryStore>,
@@ -233,11 +377,27 @@ pub fn add_dictionary_entry(
     case_sensitive: bool,
     fuzzy: bool,
 ) -> Result<DictEntry, String> {
+    if pattern.len() > DICT_FIELD_MAX_BYTES {
+        return Err(format!(
+            "dictionary pattern too large ({} bytes, max {})",
+            pattern.len(),
+            DICT_FIELD_MAX_BYTES
+        ));
+    }
+    if replacement.len() > DICT_FIELD_MAX_BYTES {
+        return Err(format!(
+            "dictionary replacement too large ({} bytes, max {})",
+            replacement.len(),
+            DICT_FIELD_MAX_BYTES
+        ));
+    }
     history
         .add_dictionary_entry(pattern.trim(), replacement.trim(), case_sensitive, fuzzy)
         .map_err(err)
 }
 
+/// update an existing dictionary entry in place. side effect: writes the
+/// dictionary table. matches no emit.
 #[tauri::command]
 pub fn update_dictionary_entry(
     history: State<'_, HistoryStore>,
@@ -247,24 +407,54 @@ pub fn update_dictionary_entry(
     case_sensitive: bool,
     fuzzy: bool,
 ) -> Result<(), String> {
+    if pattern.len() > DICT_FIELD_MAX_BYTES {
+        return Err(format!(
+            "dictionary pattern too large ({} bytes, max {})",
+            pattern.len(),
+            DICT_FIELD_MAX_BYTES
+        ));
+    }
+    if replacement.len() > DICT_FIELD_MAX_BYTES {
+        return Err(format!(
+            "dictionary replacement too large ({} bytes, max {})",
+            replacement.len(),
+            DICT_FIELD_MAX_BYTES
+        ));
+    }
     history
-        .update_dictionary_entry(id, pattern.trim(), replacement.trim(), case_sensitive, fuzzy)
+        .update_dictionary_entry(
+            id,
+            pattern.trim(),
+            replacement.trim(),
+            case_sensitive,
+            fuzzy,
+        )
         .map_err(err)
 }
 
+/// delete one dictionary entry by id. side effect: writes the dictionary
+/// table. matches no emit.
 #[tauri::command]
 pub fn delete_dictionary_entry(history: State<'_, HistoryStore>, id: i64) -> Result<(), String> {
     history.delete_dictionary_entry(id).map_err(err)
 }
 
-// persist a transcript edit and return suggested corrections (wrong to
-// right pairs) for the frontend to offer adding to the dictionary.
+/// persist a transcript edit and return suggested corrections (wrong to
+/// right pairs) for the frontend to offer adding to the dictionary. side
+/// effect: writes the transcripts table. matches no emit.
 #[tauri::command]
 pub fn update_transcript(
     history: State<'_, HistoryStore>,
     id: String,
     text: String,
 ) -> Result<Vec<Correction>, String> {
+    if text.len() > TRANSCRIPT_MAX_BYTES {
+        return Err(format!(
+            "transcript too large ({} bytes, max {})",
+            text.len(),
+            TRANSCRIPT_MAX_BYTES
+        ));
+    }
     let prev = history.update_transcript_text(&id, &text).map_err(err)?;
     match prev {
         Some(original) => Ok(crate::dictionary::extract_corrections(&original, &text)),

@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 /// an unrecognised hotkey press or a sub threshold clip short circuits back
 /// to idle. "paused" is a settings field, not a state. when paused, hotkey
 /// presses are ignored but the state machine stays idle.
+#[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AppState {
@@ -20,6 +21,10 @@ pub enum AppState {
 
 impl AppState {
     fn from_u8(v: u8) -> Self {
+        // the variants are numbered 0..=3 and we never store anything else
+        // via `set`. catching an out of range value in debug guards against
+        // a future change to the enum that forgets to update this match.
+        debug_assert!(v <= 3, "AppState::from_u8 out of range: {v}");
         match v {
             1 => AppState::Recording,
             2 => AppState::Transcribing,

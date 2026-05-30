@@ -89,11 +89,16 @@ mod real {
             );
             let text = rec.transcribe(16_000, samples);
             let trimmed = text.trim().to_string();
+            // preview of the transcript text is sensitive, demote to debug
+            // so the default log level never captures user speech content.
             tracing::info!(
                 ms = started.elapsed().as_millis() as u64,
                 output_len = trimmed.len(),
-                preview = trimmed.chars().take(80).collect::<String>(),
                 "transcribe: output"
+            );
+            tracing::debug!(
+                preview = trimmed.chars().take(80).collect::<String>(),
+                "transcribe: preview"
             );
             if trimmed.is_empty() && duration_sec > 0.5 {
                 tracing::warn!(

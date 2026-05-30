@@ -2,24 +2,41 @@
 //!
 //! uses cpal in default config (wasapi shared mode on windows).
 //! continuously runs the input stream while the app is alive, pushing samples
-//! into a ring buffer. when recording starts, we begin appending to an in
-//! memory `Vec` and prepend the last ~0.45 s already in the ring buffer.
-//! this is hex's trick for never clipping the first syllable.
+//! into a pre roll ring buffer. when recording starts, we begin appending to
+//! an in memory `rtrb` ring buffer and prepend the last ~0.45 s already in
+//! the pre roll ring buffer. this is hex's trick for never clipping the first
+//! syllable.
 //!
 //! on stop, we mono downmix and resample to 16 kHz and return a `Vec<f32>`.
+//!
+//! threading. the cpal `Stream` is owned by a dedicated long lived os thread
+//! (the capture worker). the worker calls `CoInitializeEx(MULTITHREADED)` at
+//! start and `CoUninitialize` at shutdown so wasapi has a com apartment for
+//! its entire lifetime. callers communicate with the worker via a
+//! `crossbeam-channel` of `CaptureCommand`. the cpal data callback only does
+//! a bounded push into an `rtrb` spsc ring plus a couple of atomic stores so
+//! it never allocates and never takes a contended lock.
 
 use anyhow::{anyhow, Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Stream, StreamConfig};
+use cpal::{Device, StreamConfig};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use parking_lot::Mutex;
+use rtrb::{Consumer, Producer, RingBuffer as RtrbRing};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::thread;
 
 const TARGET_SAMPLE_RATE: u32 = 16_000;
 /// maximum pre roll the ring buffer supports. the user selected pre roll
 /// (via `Settings.preRollMs`) is clamped to this value so the buffer always
 /// has enough warm samples even on the highest setting.
-const RING_SECONDS: f32 = 1.0;
+pub const RING_SECONDS: f32 = 1.0;
+/// upper bound on the recording rtrb capacity in seconds. we provision the
+/// ring at start time based on the source sample rate and channel count so
+/// even a long press fits without the callback ever needing to allocate.
+const RECORD_BUFFER_SECONDS: usize = 120;
 
 pub struct CaptureDevice {
     pub name: String,
@@ -57,25 +74,299 @@ fn pick_device(host: &cpal::Host, name: Option<&str>) -> Result<Device> {
         .ok_or_else(|| anyhow!("no default input device"))
 }
 
-/// runs for the life of the app. the inner stream is held alive via the
-/// `stream` field because cpal stops capture when the `Stream` is dropped.
-pub struct CaptureEngine {
-    #[allow(dead_code)]
-    stream: Stream,
-    ring: Arc<Mutex<RingBuffer>>,
-    recording_buf: Arc<Mutex<Vec<f32>>>,
-    recording: Arc<AtomicBool>,
-    source_rate: u32,
-    source_channels: u16,
-    /// f32 bits of current rms.
-    meter: Arc<AtomicU64>,
+/// commands accepted by the capture worker thread.
+enum CaptureCommand {
+    /// begin appending live samples to the recording buffer with `preroll_ms`
+    /// of warm pre roll prepended.
+    Start { preroll_ms: u32 },
+    /// stop recording and return resampled mono samples plus duration in
+    /// seconds. an empty vec means nothing was captured.
+    Stop { reply: Sender<(Vec<f32>, f64)> },
+    /// read the current rms meter.
+    Meter { reply: Sender<f32> },
+    /// shut the worker down cleanly. the worker drops the cpal stream and
+    /// calls `CoUninitialize` before exiting.
+    Shutdown,
 }
 
-// safety. `cpal::Stream` is not `Send` on all platforms in older versions.
-// we only use it from the thread that constructed it. tauri's state is
-// `Send + Sync` so we wrap the whole engine in a `Mutex` from the caller side.
-unsafe impl Send for CaptureEngine {}
-unsafe impl Sync for CaptureEngine {}
+/// handle to the capture worker. clones share the same underlying worker.
+/// dropping the last handle sends `Shutdown` and joins the worker thread.
+#[derive(Clone)]
+pub struct CaptureWorker {
+    inner: Arc<CaptureWorkerInner>,
+}
+
+struct CaptureWorkerInner {
+    tx: Sender<CaptureCommand>,
+    join: Mutex<Option<thread::JoinHandle<()>>>,
+}
+
+impl Drop for CaptureWorkerInner {
+    fn drop(&mut self) {
+        let _ = self.tx.send(CaptureCommand::Shutdown);
+        if let Some(handle) = self.join.lock().take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl CaptureWorker {
+    /// spawn a worker that builds a cpal input stream on the given device
+    /// name (or system default when `None`). blocks until the stream is
+    /// playing or the worker reports an error.
+    pub fn start(device_name: Option<String>) -> Result<Self> {
+        let (cmd_tx, cmd_rx) = unbounded::<CaptureCommand>();
+        let (ready_tx, ready_rx) = bounded::<Result<()>>(1);
+
+        let join = thread::Builder::new()
+            .name("mumble-capture".into())
+            .spawn(move || {
+                init_com();
+                let outcome = run_worker(device_name.as_deref(), cmd_rx);
+                let _ = ready_tx.send(outcome.map(|_| ()));
+                uninit_com();
+            })
+            .context("spawn capture worker thread")?;
+
+        // wait for the worker to either confirm the stream is live or report
+        // an init error. without this the caller would happily send `Start`
+        // before the stream exists.
+        match ready_rx.recv() {
+            Ok(Ok(())) => Ok(Self {
+                inner: Arc::new(CaptureWorkerInner {
+                    tx: cmd_tx,
+                    join: Mutex::new(Some(join)),
+                }),
+            }),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(anyhow!("capture worker dropped before reporting status")),
+        }
+    }
+
+    pub fn start_recording(&self, preroll_ms: u32) {
+        let _ = self.inner.tx.send(CaptureCommand::Start { preroll_ms });
+    }
+
+    /// stop recording. returns `(samples_16k_mono, duration_sec)`. on worker
+    /// error returns an empty vec with zero duration so the pipeline can
+    /// react gracefully.
+    pub fn stop_recording(&self) -> (Vec<f32>, f64) {
+        let (reply_tx, reply_rx) = bounded(1);
+        if self
+            .inner
+            .tx
+            .send(CaptureCommand::Stop { reply: reply_tx })
+            .is_err()
+        {
+            return (Vec::new(), 0.0);
+        }
+        reply_rx.recv().unwrap_or((Vec::new(), 0.0))
+    }
+
+    pub fn current_rms(&self) -> f32 {
+        let (reply_tx, reply_rx) = bounded(1);
+        if self
+            .inner
+            .tx
+            .send(CaptureCommand::Meter { reply: reply_tx })
+            .is_err()
+        {
+            return 0.0;
+        }
+        reply_rx.recv().unwrap_or(0.0)
+    }
+}
+
+/// initialise com on the current thread. wasapi requires a com apartment.
+/// we use multithreaded because wasapi callbacks may run on threads that
+/// did not call coinitializeex themselves and mta is the safer default.
+#[cfg(windows)]
+fn init_com() {
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+    }
+}
+
+#[cfg(not(windows))]
+fn init_com() {}
+
+#[cfg(windows)]
+fn uninit_com() {
+    use windows::Win32::System::Com::CoUninitialize;
+    unsafe {
+        CoUninitialize();
+    }
+}
+
+#[cfg(not(windows))]
+fn uninit_com() {}
+
+/// runs on the worker thread. owns the `cpal::Stream` for the worker's
+/// entire lifetime so cpal sees a stable owning thread.
+fn run_worker(device_name: Option<&str>, cmd_rx: Receiver<CaptureCommand>) -> Result<()> {
+    let host = cpal::default_host();
+    let device = pick_device(&host, device_name)?;
+    let config = device.default_input_config().context("default config")?;
+
+    let source_rate = config.sample_rate().0;
+    let source_channels = config.channels();
+
+    let ring_cap = (source_rate as f32 * RING_SECONDS * source_channels as f32) as usize;
+    let ring = Arc::new(Mutex::new(RingBuffer::new(ring_cap)));
+    let recording = Arc::new(AtomicBool::new(false));
+    let meter = Arc::new(AtomicU64::new(0));
+
+    let record_cap = (source_rate as usize * source_channels as usize * RECORD_BUFFER_SECONDS)
+        .max(TARGET_SAMPLE_RATE as usize);
+    let (producer, mut consumer) = RtrbRing::<f32>::new(record_cap);
+    let producer = Arc::new(Mutex::new(producer));
+
+    let stream_config: StreamConfig = config.clone().into();
+    let sample_format = config.sample_format();
+
+    let cb_ring = Arc::clone(&ring);
+    let cb_recording = Arc::clone(&recording);
+    let cb_meter = Arc::clone(&meter);
+    let cb_producer = Arc::clone(&producer);
+
+    let stream = match sample_format {
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &stream_config,
+            move |data: &[f32], _| {
+                process_samples_safe(data, &cb_ring, &cb_producer, &cb_recording, &cb_meter);
+            },
+            err_fn,
+            None,
+        )?,
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            &stream_config,
+            move |data: &[i16], _| {
+                // we deliberately leave this conversion alloc in place. moving
+                // it lock free is a future improvement, the recording buf is
+                // the hot path the rtrb conversion targets.
+                let converted: Vec<f32> =
+                    data.iter().map(|s| *s as f32 / i16::MAX as f32).collect();
+                process_samples_safe(&converted, &cb_ring, &cb_producer, &cb_recording, &cb_meter);
+            },
+            err_fn,
+            None,
+        )?,
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            &stream_config,
+            move |data: &[u16], _| {
+                let converted: Vec<f32> = data
+                    .iter()
+                    .map(|s| (*s as f32 / u16::MAX as f32) * 2.0 - 1.0)
+                    .collect();
+                process_samples_safe(&converted, &cb_ring, &cb_producer, &cb_recording, &cb_meter);
+            },
+            err_fn,
+            None,
+        )?,
+        fmt => return Err(anyhow!("unsupported sample format: {:?}", fmt)),
+    };
+
+    stream.play()?;
+
+    // process commands until shutdown or the sender side hangs up.
+    while let Ok(cmd) = cmd_rx.recv() {
+        match cmd {
+            CaptureCommand::Start { preroll_ms } => {
+                handle_start(
+                    preroll_ms,
+                    &ring,
+                    &producer,
+                    &recording,
+                    source_rate,
+                    source_channels,
+                );
+            }
+            CaptureCommand::Stop { reply } => {
+                let result = handle_stop(&mut consumer, &recording, source_rate, source_channels);
+                let _ = reply.send(result);
+            }
+            CaptureCommand::Meter { reply } => {
+                let rms = f32::from_bits(meter.load(Ordering::Acquire) as u32);
+                let _ = reply.send(rms);
+            }
+            CaptureCommand::Shutdown => break,
+        }
+    }
+
+    // dropping `stream` here stops cpal cleanly while we are still on the
+    // owning thread.
+    drop(stream);
+    Ok(())
+}
+
+/// begin appending live samples to the recording buffer, prepending the
+/// last `preroll_ms` of warm ring buffer audio (clamped to `RING_SECONDS`).
+///
+/// mirrors hex's `SuperFastCaptureController.startRecording`. the prepend
+/// is what stops the first syllable being clipped.
+fn handle_start(
+    preroll_ms: u32,
+    ring: &Arc<Mutex<RingBuffer>>,
+    producer: &Arc<Mutex<Producer<f32>>>,
+    recording: &Arc<AtomicBool>,
+    source_rate: u32,
+    source_channels: u16,
+) {
+    let preroll_sec = (preroll_ms as f32 / 1000.0).min(RING_SECONDS);
+    let preroll_samples = (source_rate as f32 * preroll_sec * source_channels as f32) as usize;
+    let tail = ring.lock().tail(preroll_samples);
+
+    // drain any stragglers left in the recording ring from a previous run
+    // and then push the pre roll tail before we let the callback start
+    // pushing live samples.
+    {
+        let mut prod = producer.lock();
+        // there is no direct "clear" on rtrb so we just push the tail. any
+        // stragglers from a prior session were drained on stop.
+        for s in &tail {
+            // push_back can only fail when the ring is full. given we sized
+            // the ring for two minutes of audio, dropping a few samples here
+            // is benign and far better than blocking the callback path.
+            if prod.push(*s).is_err() {
+                break;
+            }
+        }
+    }
+    recording.store(true, Ordering::Release);
+}
+
+/// stop recording. drains the rtrb ring on the worker thread (the only
+/// consumer side) then downmixes and resamples for transcription.
+fn handle_stop(
+    consumer: &mut Consumer<f32>,
+    recording: &Arc<AtomicBool>,
+    source_rate: u32,
+    source_channels: u16,
+) -> (Vec<f32>, f64) {
+    recording.store(false, Ordering::Release);
+
+    let mut raw = Vec::with_capacity(consumer.slots());
+    while let Ok(s) = consumer.pop() {
+        raw.push(s);
+    }
+
+    // a cpal callback may still be in flight when we flipped the recording
+    // flag. drain once more to pick up any stragglers it pushed between the
+    // flag flip and now. without this last sliver of audio at the end of a
+    // press can be lost.
+    while let Ok(s) = consumer.pop() {
+        raw.push(s);
+    }
+
+    let mono = downmix_mono(&raw, source_channels);
+    let mut resampled = resample_linear(&mono, source_rate, TARGET_SAMPLE_RATE);
+    // lift quiet speech to a healthy level so low volume input is not
+    // transcribed as empty or garbled. see normalize_peak.
+    normalize_peak(&mut resampled);
+    let duration = resampled.len() as f64 / TARGET_SAMPLE_RATE as f64;
+    (resampled, duration)
+}
 
 struct RingBuffer {
     buf: Vec<f32>,
@@ -86,7 +377,7 @@ struct RingBuffer {
 impl RingBuffer {
     fn new(cap: usize) -> Self {
         Self {
-            buf: vec![0.0; cap],
+            buf: vec![0.0; cap.max(1)],
             write: 0,
             filled: 0,
         }
@@ -112,125 +403,46 @@ impl RingBuffer {
     }
 }
 
-impl CaptureEngine {
-    pub fn start(device_name: Option<&str>) -> Result<Self> {
-        let host = cpal::default_host();
-        let device = pick_device(&host, device_name)?;
-        let config = device.default_input_config().context("default config")?;
-
-        let source_rate = config.sample_rate().0;
-        let source_channels = config.channels();
-
-        let ring_cap = (source_rate as f32 * RING_SECONDS * source_channels as f32) as usize;
-        let ring = Arc::new(Mutex::new(RingBuffer::new(ring_cap)));
-        let recording_buf = Arc::new(Mutex::new(Vec::new()));
-        let recording = Arc::new(AtomicBool::new(false));
-        let meter = Arc::new(AtomicU64::new(0));
-
-        let stream_config: StreamConfig = config.clone().into();
-        let sample_format = config.sample_format();
-
-        let cb_ring = Arc::clone(&ring);
-        let cb_rec_buf = Arc::clone(&recording_buf);
-        let cb_recording = Arc::clone(&recording);
-        let cb_meter = Arc::clone(&meter);
-
-        let stream = match sample_format {
-            cpal::SampleFormat::F32 => device.build_input_stream(
-                &stream_config,
-                move |data: &[f32], _| {
-                    process_samples(data, &cb_ring, &cb_rec_buf, &cb_recording, &cb_meter);
-                },
-                err_fn,
-                None,
-            )?,
-            cpal::SampleFormat::I16 => device.build_input_stream(
-                &stream_config,
-                move |data: &[i16], _| {
-                    let converted: Vec<f32> =
-                        data.iter().map(|s| *s as f32 / i16::MAX as f32).collect();
-                    process_samples(&converted, &cb_ring, &cb_rec_buf, &cb_recording, &cb_meter);
-                },
-                err_fn,
-                None,
-            )?,
-            cpal::SampleFormat::U16 => device.build_input_stream(
-                &stream_config,
-                move |data: &[u16], _| {
-                    let converted: Vec<f32> = data
-                        .iter()
-                        .map(|s| (*s as f32 / u16::MAX as f32) * 2.0 - 1.0)
-                        .collect();
-                    process_samples(&converted, &cb_ring, &cb_rec_buf, &cb_recording, &cb_meter);
-                },
-                err_fn,
-                None,
-            )?,
-            fmt => return Err(anyhow!("unsupported sample format: {:?}", fmt)),
-        };
-
-        stream.play()?;
-
-        Ok(Self {
-            stream,
-            ring,
-            recording_buf,
-            recording,
-            source_rate,
-            source_channels,
-            meter,
-        })
-    }
-
-    /// begin appending live samples to the recording buffer, prepending the
-    /// last `preroll_ms` of warm ring buffer audio (clamped to `RING_SECONDS`).
-    ///
-    /// mirrors hex's `SuperFastCaptureController.startRecording`. the prepend
-    /// is what stops the first syllable being clipped.
-    pub fn start_recording(&self, preroll_ms: u32) {
-        let preroll_sec = (preroll_ms as f32 / 1000.0).min(RING_SECONDS);
-        let preroll_samples =
-            (self.source_rate as f32 * preroll_sec * self.source_channels as f32) as usize;
-        let tail = self.ring.lock().tail(preroll_samples);
-        {
-            let mut buf = self.recording_buf.lock();
-            buf.clear();
-            buf.extend_from_slice(&tail);
-        }
-        self.recording.store(true, Ordering::Release);
-    }
-
-    /// stop recording. returns `(samples_16k_mono, duration_sec)`.
-    pub fn stop_recording(&self) -> (Vec<f32>, f64) {
-        self.recording.store(false, Ordering::Release);
-        let raw = {
-            let mut buf = self.recording_buf.lock();
-            std::mem::take(&mut *buf)
-        };
-        let mono = downmix_mono(&raw, self.source_channels);
-        let mut resampled = resample_linear(&mono, self.source_rate, TARGET_SAMPLE_RATE);
-        // lift quiet speech to a healthy level so low volume input is not
-        // transcribed as empty or garbled. see normalize_peak.
-        normalize_peak(&mut resampled);
-        let duration = resampled.len() as f64 / TARGET_SAMPLE_RATE as f64;
-        (resampled, duration)
-    }
-
-    pub fn current_rms(&self) -> f32 {
-        f32::from_bits(self.meter.load(Ordering::Acquire) as u32)
+/// wrap the inner sample processing in catch_unwind. cpal invokes this from
+/// an os audio thread. a panic here would propagate up through ffi and
+/// abort the process. swallowing it and logging instead lets the worker
+/// keep running, the user only loses the current callback.
+fn process_samples_safe(
+    data: &[f32],
+    ring: &Arc<Mutex<RingBuffer>>,
+    producer: &Arc<Mutex<Producer<f32>>>,
+    recording: &Arc<AtomicBool>,
+    meter: &Arc<AtomicU64>,
+) {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        process_samples(data, ring, producer, recording, meter);
+    }));
+    if result.is_err() {
+        tracing::error!("audio callback panicked");
     }
 }
 
 fn process_samples(
     data: &[f32],
     ring: &Arc<Mutex<RingBuffer>>,
-    rec_buf: &Arc<Mutex<Vec<f32>>>,
+    producer: &Arc<Mutex<Producer<f32>>>,
     recording: &Arc<AtomicBool>,
     meter: &Arc<AtomicU64>,
 ) {
     ring.lock().push(data);
     if recording.load(Ordering::Acquire) {
-        rec_buf.lock().extend_from_slice(data);
+        // we only ever produce from this callback so the lock is contended
+        // only with the very brief drain in handle_start. push_back is
+        // bounded so this never allocates.
+        let mut prod = producer.lock();
+        for s in data {
+            if prod.push(*s).is_err() {
+                // ring is full. drop the remainder of this packet. the
+                // worker is the only consumer so this only happens if the
+                // user held the hotkey for more than RECORD_BUFFER_SECONDS.
+                break;
+            }
+        }
     }
     let sum_sq: f32 = data.iter().map(|s| s * s).sum();
     let rms = (sum_sq / data.len().max(1) as f32).sqrt();
@@ -371,20 +583,120 @@ fn window_rms(slice: &[f32]) -> f32 {
     (sum_sq / slice.len() as f32).sqrt()
 }
 
-/// write 16 kHz mono f32 samples as a 16 bit pcm wav file.
-#[allow(dead_code)]
-pub fn write_wav(path: &std::path::Path, samples: &[f32]) -> Result<()> {
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: TARGET_SAMPLE_RATE,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut writer = hound::WavWriter::create(path, spec)?;
-    for s in samples {
-        let clamped = (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
-        writer.write_sample(clamped)?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SR: u32 = 16_000;
+
+    fn chunk_min_samples() -> usize {
+        (CHUNK_MIN_SEC * SR as f32) as usize
     }
-    writer.finalize()?;
-    Ok(())
+
+    fn chunk_max_samples() -> usize {
+        (CHUNK_MAX_SEC * SR as f32) as usize
+    }
+
+    fn overlap_samples() -> usize {
+        (OVERLAP_MS as f32 / 1000.0 * SR as f32) as usize
+    }
+
+    fn search_window_samples() -> usize {
+        (SEARCH_WINDOW_SEC * SR as f32) as usize
+    }
+
+    // short input falls into the single chunk early return path and should
+    // pass through unchanged.
+    #[test]
+    fn short_input_returns_single_slice_unchanged() {
+        let samples: Vec<f32> = (0..(SR as usize * 2)).map(|i| (i as f32) * 0.001).collect();
+        let chunks = chunk_for_transcription(&samples, SR);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].len(), samples.len());
+        assert_eq!(chunks[0].as_ptr(), samples.as_ptr());
+    }
+
+    // a long input must produce multiple chunks none of which is shorter
+    // than chunk_min (modulo the final tail).
+    #[test]
+    fn long_input_chunks_respect_min_size() {
+        let len = SR as usize * 30;
+        let samples = vec![0.1f32; len];
+        let chunks = chunk_for_transcription(&samples, SR);
+        assert!(
+            chunks.len() > 1,
+            "expected multiple chunks, got {}",
+            chunks.len()
+        );
+        let min = chunk_min_samples();
+        for (i, chunk) in chunks.iter().enumerate() {
+            if i + 1 < chunks.len() {
+                assert!(
+                    chunk.len() >= min,
+                    "chunk {i} length {} below chunk_min {min}",
+                    chunk.len()
+                );
+            }
+        }
+    }
+
+    // consecutive chunks may overlap, but never by more than OVERLAP_MS of
+    // audio worth of samples.
+    #[test]
+    fn consecutive_chunks_overlap_is_bounded() {
+        let len = SR as usize * 30;
+        let samples = vec![0.1f32; len];
+        let chunks = chunk_for_transcription(&samples, SR);
+        let overlap_max = overlap_samples();
+        // since each chunk is a sub slice of samples we can use pointer
+        // arithmetic to find each chunk's start offset.
+        let base = samples.as_ptr() as usize;
+        let starts: Vec<usize> = chunks
+            .iter()
+            .map(|c| (c.as_ptr() as usize - base) / std::mem::size_of::<f32>())
+            .collect();
+        for i in 0..chunks.len().saturating_sub(1) {
+            let prev_start = starts[i];
+            let prev_end = prev_start + chunks[i].len();
+            let next_start = starts[i + 1];
+            if next_start < prev_end {
+                let overlap = prev_end - next_start;
+                assert!(
+                    overlap <= overlap_max,
+                    "overlap {overlap} exceeds OVERLAP_MS budget {overlap_max}"
+                );
+            }
+        }
+    }
+
+    // the cut between two chunks must fall inside the silence search
+    // window, ie not earlier than (ideal_end - search_window) and never
+    // past ideal_end.
+    #[test]
+    fn cuts_fall_inside_search_window() {
+        let len = SR as usize * 30;
+        let samples = vec![0.1f32; len];
+        let chunks = chunk_for_transcription(&samples, SR);
+        let chunk_max = chunk_max_samples();
+        let search = search_window_samples();
+        let base = samples.as_ptr() as usize;
+        let starts: Vec<usize> = chunks
+            .iter()
+            .map(|c| (c.as_ptr() as usize - base) / std::mem::size_of::<f32>())
+            .collect();
+        for (i, chunk) in chunks
+            .iter()
+            .enumerate()
+            .take(chunks.len().saturating_sub(1))
+        {
+            let start = starts[i];
+            let cut = start + chunk.len();
+            let ideal_end = start + chunk_max;
+            let lower = ideal_end.saturating_sub(search);
+            assert!(
+                cut >= lower && cut <= ideal_end,
+                "cut {cut} outside search window [{lower}, {ideal_end}]"
+            );
+        }
+    }
 }

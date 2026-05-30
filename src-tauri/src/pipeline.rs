@@ -16,13 +16,20 @@ use std::sync::Arc;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::audio::CaptureEngine;
+use crate::audio::CaptureWorker;
 use crate::history::{HistoryStore, Transcript};
-use crate::paste;
+use crate::paste::PasteClient;
 use crate::settings::SettingsStore;
 use crate::state::{AppState, SharedState};
 use crate::target_app;
 use crate::transcribe::Transcriber;
+
+#[cfg(windows)]
+use windows::Win32::Foundation::HWND;
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{
+    SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+};
 
 /// sub threshold tap floor measured in wall clock press time. anything
 /// shorter than this is treated as a fat finger tap and discarded without
@@ -54,12 +61,23 @@ pub struct ChunkProgressEvent {
     pub total: u32,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToastEvent {
+    pub kind: String,
+    pub text: String,
+}
+
 pub struct Pipeline {
     pub state: Arc<SharedState>,
-    pub capture: Arc<Mutex<Option<CaptureEngine>>>,
+    pub capture: Arc<Mutex<Option<CaptureWorker>>>,
     pub transcriber: Arc<Mutex<Option<Arc<dyn Transcriber>>>>,
     pub history: HistoryStore,
     pub settings: SettingsStore,
+    /// long lived paste worker. owns a single sta com apartment for the
+    /// life of the app so every clipboard and `SendInput` call lands on the
+    /// same thread.
+    pub paste_client: PasteClient,
     /// wall clock time of the most recent hotkey press, used for the
     /// sub threshold tap floor. audio duration would include the pre roll
     /// and so cannot be used for this purpose.
@@ -67,13 +85,14 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn new(history: HistoryStore, settings: SettingsStore) -> Self {
+    pub fn new(history: HistoryStore, settings: SettingsStore, paste_client: PasteClient) -> Self {
         Self {
             state: Arc::new(SharedState::new()),
             capture: Arc::new(Mutex::new(None)),
             transcriber: Arc::new(Mutex::new(None)),
             history,
             settings,
+            paste_client,
             recording_started_at: Arc::new(Mutex::new(None)),
         }
     }
@@ -85,7 +104,7 @@ impl Pipeline {
     pub fn ensure_capture(&self, device: Option<&str>) -> Result<()> {
         let mut guard = self.capture.lock();
         if guard.is_none() {
-            *guard = Some(CaptureEngine::start(device)?);
+            *guard = Some(CaptureWorker::start(device.map(|s| s.to_string()))?);
         }
         Ok(())
     }
@@ -107,7 +126,10 @@ impl Pipeline {
         // it gates on the transcriber being initialised).
         if self.transcriber.lock().is_none() {
             tracing::warn!("on_hotkey_press: transcriber not ready");
-            emit_error(app, "Mumble is still loading the model. Please wait.".into());
+            emit_error(
+                app,
+                "Mumble is still loading the model. Please wait.".into(),
+            );
             return;
         }
 
@@ -132,7 +154,10 @@ impl Pipeline {
 
         emit_state(app, AppState::Recording);
         show_indicator(app);
-        tracing::info!(elapsed_ms = t0.elapsed().as_millis() as u64, "on_hotkey_press: indicator shown");
+        tracing::info!(
+            elapsed_ms = t0.elapsed().as_millis() as u64,
+            "on_hotkey_press: indicator shown"
+        );
     }
 
     /// called from the hotkey thread on key release.
@@ -167,6 +192,25 @@ impl Pipeline {
             return;
         }
 
+        // an empty samples vec means the capture worker reported no audio.
+        // this happens when the input device disappears mid press or wasapi
+        // refuses to start the stream. skip the transcribe path entirely
+        // and surface a banner so the user knows why nothing was pasted.
+        if samples.is_empty() {
+            tracing::warn!("on_hotkey_release: capture returned empty samples");
+            self.state.set(AppState::Idle);
+            emit_state(app, AppState::Idle);
+            hide_indicator(app);
+            let _ = app.emit(
+                "mumble://error",
+                serde_json::json!({
+                    "kind": "capture-unavailable",
+                    "message": "no audio captured. check your input device in settings.",
+                }),
+            );
+            return;
+        }
+
         emit_state(app, AppState::Transcribing);
 
         let release_time = Instant::now();
@@ -175,6 +219,13 @@ impl Pipeline {
         let history = self.history.clone();
         let shared_state = self.state.clone();
         let settings = self.settings.get();
+        let paste_client = self.paste_client.clone();
+
+        // schedule a 30s watchdog. if the transcribe/paste path is still
+        // running by then something is wedged (sherpa onnx hang, paste
+        // worker stuck, etc). reset to idle, hide the indicator, and let
+        // the ui banner the user instead of leaving the app frozen.
+        spawn_watchdog(app.clone(), shared_state.clone());
 
         tauri::async_runtime::spawn_blocking(move || {
             // chunk the audio so each piece stays under the sherpa onnx
@@ -182,31 +233,31 @@ impl Pipeline {
             // identically to the pre chunking path.
             let chunks = crate::audio::chunk_for_transcription(&samples, 16_000);
             let total = chunks.len() as u32;
-            tracing::info!(
+            tracing::debug!(
                 total_chunks = total,
                 total_samples = samples.len(),
                 total_duration_sec = format!("{:.2}", samples.len() as f32 / 16_000.0),
                 "transcribe: chunked"
-            ); // TODO cleanup
+            );
 
             // capture the foreground app and snapshot the clipboard before any
             // paste keystrokes. once we synth Ctrl+V the focus may shift.
-            let (captured_app, captured_app_path) = if settings.auto_paste {
-                match target_app::current_foreground_app() {
-                    Some((name, path)) => (Some(name), Some(path)),
-                    None => (None, None),
-                }
+            let captured = if settings.auto_paste {
+                target_app::current_foreground_app()
             } else {
-                (None, None)
+                None
             };
+            let captured_app = captured.as_ref().map(|c| c.name.clone());
+            let captured_app_path = captured.as_ref().map(|c| c.path.clone());
+            let captured_hwnd: isize = captured.as_ref().map(|c| c.hwnd).unwrap_or(0);
             let prior_clipboard = if settings.auto_paste {
-                paste::snapshot_clipboard()
+                paste_client.snapshot_clipboard()
             } else {
                 None
             };
 
             // diagnostic. confirm which app we captured as the paste target.
-            tracing::info!(?captured_app, "paste: captured foreground target"); // TODO cleanup
+            tracing::debug!(?captured_app, "paste: captured foreground target");
 
             shared_state.set(AppState::Pasting);
             emit_state(&app, AppState::Pasting);
@@ -216,17 +267,22 @@ impl Pipeline {
             let dict = history.list_dictionary().unwrap_or_default();
 
             let mut accumulated = String::new();
+            // flipped if the focus mismatch fallback fires. in that case the
+            // accumulated text is already sitting in the clipboard via
+            // `copy_only` and we must NOT restore the prior clipboard at the
+            // end of the run, or we would wipe the user's transcript.
+            let mut focus_fallback_fired = false;
 
             for (i, chunk) in chunks.iter().enumerate() {
                 let idx = i as u32 + 1;
                 emit_chunk_progress(&app, idx, total);
-                tracing::info!(
+                tracing::debug!(
                     chunk = idx,
                     of = total,
                     samples = chunk.len(),
                     duration_sec = format!("{:.2}", chunk.len() as f32 / 16_000.0),
                     "transcribe: chunk"
-                ); // TODO cleanup
+                );
 
                 let text = match &transcriber {
                     Some(t) => t.transcribe(chunk).unwrap_or_else(|e| {
@@ -244,11 +300,7 @@ impl Pipeline {
                 let text = crate::dictionary::apply(&text, &dict);
 
                 if text.is_empty() {
-                    tracing::warn!(
-                        chunk = idx,
-                        of = total,
-                        "chunk returned empty, skipping"
-                    ); // TODO cleanup
+                    tracing::warn!(chunk = idx, of = total, "chunk returned empty, skipping");
                     continue;
                 }
 
@@ -259,16 +311,47 @@ impl Pipeline {
                 accumulated.push_str(&text);
 
                 if settings.auto_paste {
-                    // diagnostic. is the captured target still the foreground
-                    // window when we fire Ctrl+V, or did focus move to mumble?
-                    let fg_now = target_app::current_foreground_app().map(|(n, _)| n);
-                    tracing::info!(
-                        ?fg_now,
-                        ?captured_app,
+                    // re focus the captured window before each paste.
+                    // SetForegroundWindow can fail if the user has moved focus
+                    // themselves, or if windows refuses to honour our attempt.
+                    let focus_result = paste_client.focus_target(captured_hwnd);
+                    if let Err(ref e) = focus_result {
+                        tracing::warn!(?e, chunk = idx, "paste: focus_target failed");
+                    }
+
+                    // sanity check the actual foreground hwnd against what we
+                    // captured. if they disagree AND we could not re focus,
+                    // synthesising ctrl plus v would paste into the wrong app,
+                    // so fall back to copy only and tell the ui about it.
+                    let fg_now = target_app::current_foreground_hwnd();
+                    let mismatch = captured_hwnd != 0 && fg_now != captured_hwnd;
+                    tracing::debug!(
+                        fg_now,
+                        captured_hwnd,
                         chunk = idx,
+                        mismatch,
                         "paste: foreground before Ctrl+V"
-                    ); // TODO cleanup
-                    if let Err(e) = paste::paste_chunk(&text, leading_space) {
+                    );
+
+                    if mismatch && focus_result.is_err() {
+                        if let Err(e) = paste_client.copy_only(&accumulated) {
+                            tracing::error!(?e, "copy_only fallback failed");
+                            emit_error(&app, e.to_string());
+                        }
+                        emit_toast(
+                            &app,
+                            "focus-changed",
+                            "focus changed, copied to clipboard instead",
+                        );
+                        focus_fallback_fired = true;
+                        // skip the keystroke and the rest of the chunks. the
+                        // user can paste the joined transcript manually.
+                        break;
+                    }
+
+                    if let Err(e) =
+                        paste_client.paste_chunk(text.clone(), leading_space, captured_hwnd)
+                    {
                         tracing::error!(?e, "paste_chunk failed");
                         emit_error(&app, e.to_string());
                     }
@@ -277,13 +360,15 @@ impl Pipeline {
 
             // restore the clipboard once after every paste lands. for the
             // copy only path, write the joined transcript to the clipboard
-            // so the user can manually paste it wherever they want.
-            if settings.auto_paste {
-                if let Err(e) = paste::restore_clipboard(prior_clipboard) {
+            // so the user can manually paste it wherever they want. when the
+            // focus mismatch fallback fired, leave the transcript in the
+            // clipboard so the user can paste it themselves.
+            if settings.auto_paste && !focus_fallback_fired {
+                if let Err(e) = paste_client.restore_clipboard(prior_clipboard) {
                     tracing::error!(?e, "restore_clipboard failed");
                 }
-            } else if !accumulated.trim().is_empty() {
-                if let Err(e) = paste::copy_only(accumulated.trim()) {
+            } else if !settings.auto_paste && !accumulated.trim().is_empty() {
+                if let Err(e) = paste_client.copy_only(accumulated.trim()) {
                     tracing::error!(?e, "copy_only failed");
                     emit_error(&app, e.to_string());
                 }
@@ -349,12 +434,34 @@ impl Pipeline {
 }
 
 fn new_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    format!("t_{:x}", nanos)
+    uuid::Uuid::new_v4().to_string()
+}
+
+/// run a 30 s watchdog on a background thread. if the app state has not
+/// returned to idle by the deadline the transcribe or paste path is wedged.
+/// the watchdog resets to idle, hides the indicator, and emits a stuck
+/// error so the ui can banner the user.
+fn spawn_watchdog(app: AppHandle, shared_state: Arc<SharedState>) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(30));
+        let current = shared_state.get();
+        if matches!(
+            current,
+            AppState::Recording | AppState::Transcribing | AppState::Pasting
+        ) {
+            tracing::warn!(?current, "watchdog: pipeline stuck, resetting to idle");
+            shared_state.set(AppState::Idle);
+            emit_state(&app, AppState::Idle);
+            hide_indicator(&app);
+            let _ = app.emit(
+                "mumble://error",
+                serde_json::json!({
+                    "kind": "stuck",
+                    "state": format!("{current:?}"),
+                }),
+            );
+        }
+    });
 }
 
 fn emit_state(app: &AppHandle, state: AppState) {
@@ -372,17 +479,59 @@ fn emit_chunk_progress(app: &AppHandle, current: u32, total: u32) {
     );
 }
 
+fn emit_toast(app: &AppHandle, kind: &str, text: &str) {
+    let _ = app.emit(
+        "mumble://toast",
+        ToastEvent {
+            kind: kind.to_string(),
+            text: text.to_string(),
+        },
+    );
+}
+
 /// show the indicator at the bottom center of the active monitor.
 ///
 /// always on top and click through are set once at app startup (see `lib.rs`).
-/// this function only handles per press positioning and show or hide.
+/// this function only handles per press positioning and show. on windows we
+/// route the show through `SetWindowPos(SWP_SHOWWINDOW | SWP_NOACTIVATE)` so
+/// the indicator never steals foreground from whatever app the user is
+/// currently typing into.
 fn show_indicator(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("indicator") {
         if let Err(e) = position_indicator(&win) {
             tracing::warn!(?e, "position indicator");
         }
-        let _ = win.show();
+        #[cfg(windows)]
+        {
+            if let Err(e) = show_indicator_noactivate(&win) {
+                tracing::warn!(?e, "show indicator via SetWindowPos failed, falling back");
+                let _ = win.show();
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = win.show();
+        }
     }
+}
+
+#[cfg(windows)]
+fn show_indicator_noactivate(win: &tauri::WebviewWindow) -> Result<()> {
+    let raw = win.hwnd().map_err(|e| anyhow::anyhow!("hwnd: {e}"))?;
+    let hwnd = HWND(raw.0 as *mut core::ffi::c_void);
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+        )
+        .map_err(|e| anyhow::anyhow!("SetWindowPos: {e}"))?;
+    }
+    Ok(())
 }
 
 fn hide_indicator(app: &AppHandle) {

@@ -3,17 +3,22 @@
 // on non-windows builds the cache always returns None (stub).
 
 use base64::Engine as _;
+use lru::LruCache;
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::num::NonZeroUsize;
+
+// cap the cache so a runaway insights view cannot grow it without bound.
+const ICON_CACHE_CAP: usize = 256;
 
 pub struct IconCache {
-    inner: Mutex<HashMap<String, Option<String>>>,
+    inner: Mutex<LruCache<String, Option<String>>>,
 }
 
 impl IconCache {
     pub fn new() -> Self {
+        let cap = NonZeroUsize::new(ICON_CACHE_CAP).expect("non zero cap");
         Self {
-            inner: Mutex::new(HashMap::new()),
+            inner: Mutex::new(LruCache::new(cap)),
         }
     }
 
@@ -27,7 +32,7 @@ impl IconCache {
         let extracted = extract_icon(exe_path);
         self.inner
             .lock()
-            .insert(exe_path.to_string(), extracted.clone());
+            .put(exe_path.to_string(), extracted.clone());
         extracted
     }
 }
@@ -42,16 +47,16 @@ impl Default for IconCache {
 fn extract_icon(exe_path: &str) -> Option<String> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
     use windows::Win32::Graphics::Gdi::{
-        BITMAP, BITMAPINFO, BITMAPINFOHEADER, CreateCompatibleDC, DeleteDC,
-        DeleteObject, DIB_RGB_COLORS, GetDIBits, GetObjectW, SelectObject,
+        CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, SelectObject, BITMAP,
+        BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS,
     };
     use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
     use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON};
     use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
-    use windows::core::PCWSTR;
 
-    // encode path as null-terminated utf-16
+    // encode path as null terminated utf16
     let wide: Vec<u16> = OsStr::new(exe_path)
         .encode_wide()
         .chain(std::iter::once(0))
@@ -101,10 +106,10 @@ fn extract_icon(exe_path: &str) -> Option<String> {
             bmiHeader: BITMAPINFOHEADER {
                 biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
                 biWidth: width as i32,
-                biHeight: -(height as i32),  // top-down dib
+                biHeight: -(height as i32), // top down dib
                 biPlanes: 1,
                 biBitCount: 32,
-                biCompression: 0,  // BI_RGB
+                biCompression: 0, // BI_RGB
                 ..Default::default()
             },
             ..Default::default()
@@ -159,14 +164,14 @@ fn encode_rgba_to_png(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
         out.extend_from_slice(&crc.to_be_bytes());
     };
 
-    // ihdr: width, height, 8-bit depth, rgba color type 6
+    // ihdr: width, height, 8 bit depth, rgba color type 6
     let mut ihdr = Vec::with_capacity(13);
     ihdr.extend_from_slice(&width.to_be_bytes());
     ihdr.extend_from_slice(&height.to_be_bytes());
     ihdr.extend_from_slice(&[8, 6, 0, 0, 0]);
     write_chunk(&mut out, b"IHDR", &ihdr);
 
-    // idat: prepend a none-filter byte per row, then zlib-deflate
+    // idat: prepend a none filter byte per row, then zlib deflate
     let stride = width as usize * 4;
     let mut raw = Vec::with_capacity(height as usize * (stride + 1));
     for row in 0..height as usize {
@@ -188,7 +193,11 @@ fn crc32(tag: &[u8; 4], data: &[u8]) -> u32 {
         for (i, entry) in t.iter_mut().enumerate() {
             let mut c = i as u32;
             for _ in 0..8 {
-                c = if c & 1 != 0 { 0xedb88320 ^ (c >> 1) } else { c >> 1 };
+                c = if c & 1 != 0 {
+                    0xedb88320 ^ (c >> 1)
+                } else {
+                    c >> 1
+                };
             }
             *entry = c;
         }
@@ -202,7 +211,8 @@ fn crc32(tag: &[u8; 4], data: &[u8]) -> u32 {
 }
 
 #[cfg(not(windows))]
-fn extract_icon(_exe_path: &str) -> Option<String> {
+fn extract_icon(exe_path: &str) -> Option<String> {
+    let _ = exe_path;
     None
 }
 

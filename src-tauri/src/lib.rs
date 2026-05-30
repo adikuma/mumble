@@ -14,15 +14,25 @@ mod target_app;
 mod transcribe;
 mod tray;
 
+use std::sync::mpsc;
 use std::sync::Arc;
+use std::thread;
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::ManagerExt;
 use tracing_subscriber::EnvFilter;
 
 use crate::history::HistoryStore;
 use crate::hotkey::{HotkeyEvent, HotkeyListener};
+use crate::paste::PasteClient;
 use crate::pipeline::Pipeline;
 use crate::settings::SettingsStore;
+
+#[cfg(windows)]
+use windows::Win32::Foundation::HWND;
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,8 +43,13 @@ pub fn run() {
         .try_init();
 
     let settings = SettingsStore::load();
-    let history = HistoryStore::open().expect("failed to open history.db");
-    let pipeline = Arc::new(Pipeline::new(history.clone(), settings.clone()));
+    let (history, history_recovery_message) = open_history_with_recovery();
+    let paste_client = PasteClient::start().expect("failed to start paste worker");
+    let pipeline = Arc::new(Pipeline::new(
+        history.clone(),
+        settings.clone(),
+        paste_client.clone(),
+    ));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -50,10 +65,24 @@ pub fn run() {
         .setup({
             let settings = settings.clone();
             let pipeline = pipeline.clone();
+            let recovery_message = history_recovery_message.clone();
             move |app| {
                 // 1. build the tray icon.
                 if let Err(e) = tray::build(app.handle()) {
                     tracing::error!(?e, "failed to build tray");
+                }
+
+                // surface the history db recovery banner to the ui if open
+                // failed and we fell back to a tagged in memory store.
+                if let Some(msg) = recovery_message.as_ref() {
+                    let _ = app.handle().emit(
+                        "mumble://error",
+                        serde_json::json!({
+                            "kind": "history-db",
+                            "recoverable": true,
+                            "message": msg,
+                        }),
+                    );
                 }
 
                 // 2. hide main window if user prefers start minimized.
@@ -65,9 +94,16 @@ pub fn run() {
 
                 // 3. indicator window. hidden at launch and click through set
                 //    once (bug fix. was previously reapplied on every press).
+                //    we also stamp WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW on the
+                //    raw hwnd so showing the indicator never steals foreground
+                //    from the user's typing target.
                 if let Some(win) = app.get_webview_window("indicator") {
                     let _ = win.hide();
                     let _ = win.set_ignore_cursor_events(true);
+                    #[cfg(windows)]
+                    if let Err(e) = apply_indicator_window_styles(&win) {
+                        tracing::warn!(?e, "indicator WS_EX_NOACTIVATE apply failed");
+                    }
                 }
 
                 // 4. sync the os autostart entry with our persisted setting.
@@ -88,18 +124,56 @@ pub fn run() {
                 }
 
                 // 5. kick off the global hotkey listener.
+                //
+                // press and release are serialized through a single mpsc
+                // bounded channel drained by one dispatcher thread. that
+                // guarantees ordering, so a release never races ahead of
+                // its own press into the pipeline, and rdev's hook stays
+                // unblocked because send is constant time. the dispatcher
+                // calls into pipeline synchronously.
                 let app_handle = app.handle().clone();
                 let pipeline_for_hotkey = pipeline.clone();
-                let listener = HotkeyListener::spawn(settings.get().hotkey, move |evt| {
-                    let app = app_handle.clone();
-                    let pipeline = pipeline_for_hotkey.clone();
-                    // offload to an async runtime so the hotkey callback
-                    // returns quickly. rdev is very sensitive to blocking.
-                    tauri::async_runtime::spawn_blocking(move || match evt {
-                        HotkeyEvent::Pressed => pipeline.on_hotkey_press(&app),
-                        HotkeyEvent::Released => pipeline.on_hotkey_release(&app),
-                    });
-                });
+                let (hotkey_tx, hotkey_rx) = mpsc::sync_channel::<HotkeyEvent>(16);
+                thread::Builder::new()
+                    .name("mumble-hotkey-dispatch".into())
+                    .spawn(move || {
+                        while let Ok(evt) = hotkey_rx.recv() {
+                            match evt {
+                                HotkeyEvent::Pressed => {
+                                    pipeline_for_hotkey.on_hotkey_press(&app_handle)
+                                }
+                                HotkeyEvent::Released => {
+                                    pipeline_for_hotkey.on_hotkey_release(&app_handle)
+                                }
+                            }
+                        }
+                    })
+                    .expect("spawn hotkey dispatcher thread");
+
+                let app_handle_for_died = app.handle().clone();
+                let listener = HotkeyListener::spawn(
+                    settings.get().hotkey,
+                    move |evt| {
+                        // try_send keeps the rdev hook fast even if the
+                        // dispatcher is busy. dropping an event under sustained
+                        // backpressure is preferable to blocking the global
+                        // keyboard hook.
+                        if let Err(e) = hotkey_tx.try_send(evt) {
+                            tracing::warn!(?e, "hotkey channel full, dropping event");
+                        }
+                    },
+                    move || {
+                        // fired once on the first hook death so the ui can
+                        // banner the user. the listener thread keeps trying
+                        // to reinstall the hook in the background.
+                        let _ = app_handle_for_died.emit(
+                            "mumble://hotkey-died",
+                            serde_json::json!({
+                                "message": "global hotkey hook crashed, attempting to restart",
+                            }),
+                        );
+                    },
+                );
                 app.manage(listener);
 
                 // 6. load the transcriber in the background. may download
@@ -124,15 +198,30 @@ pub fn run() {
                         );
                         return;
                     }
-                    match transcribe::load(dir) {
-                        Ok(t) => {
+                    // transcribe::load drops onto sherpa onnx init which
+                    // blocks for a couple of seconds while it loads the
+                    // model weights. push it off the tokio worker so the
+                    // async runtime is not stalled.
+                    let loaded =
+                        tauri::async_runtime::spawn_blocking(move || transcribe::load(dir)).await;
+                    match loaded {
+                        Ok(Ok(t)) => {
                             let t: Arc<dyn transcribe::Transcriber> = Arc::from(t);
                             pipeline_for_load.set_transcriber(t);
                             let _ = app_handle
                                 .emit("mumble://ready", serde_json::json!({ "ready": true }));
                         }
-                        Err(e) => {
+                        Ok(Err(e)) => {
                             tracing::error!(?e, "transcriber init failed");
+                            let _ = app_handle.emit(
+                                "mumble://error",
+                                serde_json::json!({
+                                    "message": format!("transcriber init failed: {e}")
+                                }),
+                            );
+                        }
+                        Err(e) => {
+                            tracing::error!(?e, "transcriber init task join failed");
                             let _ = app_handle.emit(
                                 "mumble://error",
                                 serde_json::json!({
@@ -182,4 +271,81 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// stamp `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` onto the indicator window's
+/// extended style. `WS_EX_NOACTIVATE` is the one that actually matters for
+/// paste correctness, it tells windows not to give us focus when we show
+/// the window. `WS_EX_TOOLWINDOW` hides the indicator from the alt+tab list.
+#[cfg(windows)]
+fn apply_indicator_window_styles(win: &tauri::WebviewWindow) -> anyhow::Result<()> {
+    let raw = win.hwnd().map_err(|e| anyhow::anyhow!("hwnd: {e}"))?;
+    let hwnd = HWND(raw.0 as *mut core::ffi::c_void);
+    unsafe {
+        let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let updated = current | (WS_EX_NOACTIVATE.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
+    }
+    Ok(())
+}
+
+/// open the history db, recovering from corruption rather than crashing.
+///
+/// the on disk file can get torn on power loss or runaway disk corruption.
+/// rather than crashing the whole app, rename the bad file aside, retry
+/// once, and as a last resort fall back to an in memory store so the user
+/// can still dictate (history will not persist until the file is fixed).
+/// returns the store plus an optional recovery message the ui can banner.
+fn open_history_with_recovery() -> (HistoryStore, Option<String>) {
+    match HistoryStore::open() {
+        Ok(store) => (store, None),
+        Err(first_err) => {
+            let path = match crate::paths::history_db_path() {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::error!(?e, "history_db_path failed during recovery");
+                    let store = HistoryStore::open_in_memory()
+                        .expect("in memory history store init failed");
+                    return (store, Some(format!("history db unavailable: {e}")));
+                }
+            };
+            tracing::error!(
+                ?first_err,
+                path = %path.display(),
+                "failed to open history.db, attempting recovery"
+            );
+
+            let unix_ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let bak = path.with_extension(format!("db.bak.{unix_ts}"));
+            if let Err(e) = std::fs::rename(&path, &bak) {
+                tracing::warn!(?e, dst = %bak.display(), "rename to .bak failed");
+            }
+
+            match HistoryStore::open() {
+                Ok(store) => {
+                    let msg = format!(
+                        "history.db was corrupt and has been moved to {}. a fresh history was created.",
+                        bak.display()
+                    );
+                    tracing::warn!(%msg, "history db recovered with fresh file");
+                    (store, Some(msg))
+                }
+                Err(second_err) => {
+                    tracing::error!(
+                        ?second_err,
+                        "history.db retry failed, falling back to in memory store"
+                    );
+                    let store = HistoryStore::open_in_memory()
+                        .expect("in memory history store init failed");
+                    let msg = format!(
+                        "history is running in memory only, on disk db failed: {second_err}"
+                    );
+                    (store, Some(msg))
+                }
+            }
+        }
+    }
 }

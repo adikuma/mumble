@@ -76,15 +76,36 @@ impl HistoryStore {
         Self::from_connection(conn)
     }
 
-    #[cfg(test)]
+    /// open an ephemeral in memory store. used by tests and as the fallback
+    /// when the on disk database is corrupt and cannot be recovered, so the
+    /// app can still boot. data written here is lost when the app exits.
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         Self::from_connection(conn)
     }
 
     fn from_connection(conn: Connection) -> Result<Self> {
-        // fresh dbs get the full schema. existing dbs get migrated below.
+        // sqlite tuning. wal lets readers and writers coexist without
+        // blocking each other. synchronous normal is the recommended
+        // pairing for wal and is durable across app crashes (only an os
+        // crash can lose a recently committed txn). busy timeout gives
+        // any concurrent writer five seconds before bailing instead of
+        // returning busy immediately. foreign keys are off by default in
+        // sqlite, we want them on for future schema work.
         conn.execute_batch(
+            r#"
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            PRAGMA busy_timeout=5000;
+            PRAGMA foreign_keys=ON;
+            "#,
+        )?;
+
+        // fresh dbs get the full schema. existing dbs get migrated below.
+        // wrap multi statement schema setup in a transaction so a crash
+        // mid migration leaves the db in a known state.
+        let tx = conn.unchecked_transaction()?;
+        tx.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS transcripts (
                 id TEXT PRIMARY KEY,
@@ -110,7 +131,8 @@ impl HistoryStore {
             );
             "#,
         )?;
-        migrate(&conn)?;
+        migrate_in_tx(&tx)?;
+        tx.commit()?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -139,30 +161,35 @@ impl HistoryStore {
 
     pub fn list(&self, query: Option<&str>, limit: i64) -> Result<Vec<Transcript>> {
         let conn = self.conn.lock();
-        let (sql, like_param): (&str, String) = match query {
-            Some(q) if !q.trim().is_empty() => (
-                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
-                 FROM transcripts
-                 WHERE text LIKE ?1
-                 ORDER BY created_at DESC
-                 LIMIT ?2",
-                format!("%{}%", q),
-            ),
-            _ => (
-                "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
-                 FROM transcripts
-                 ORDER BY created_at DESC
-                 LIMIT ?2",
-                String::new(),
-            ),
-        };
-
-        let mut stmt = conn.prepare(sql)?;
-        let rows = stmt.query_map(params![like_param, limit], |row| {
-            row_to_transcript(row)
-        })?;
-        rows.collect::<rusqlite::Result<Vec<_>>>()
-            .context("collect transcript rows")
+        // the previous implementation always bound a placeholder string for
+        // the no query branch, which left sqlite to ignore it. split the
+        // path into two prepared statements that only bind what they need.
+        match query {
+            Some(q) if !q.trim().is_empty() => {
+                let like_param = format!("%{}%", q);
+                let mut stmt = conn.prepare(
+                    "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
+                     FROM transcripts
+                     WHERE text LIKE ?1
+                     ORDER BY created_at DESC
+                     LIMIT ?2",
+                )?;
+                let rows = stmt.query_map(params![like_param, limit], row_to_transcript)?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()
+                    .context("collect transcript rows")
+            }
+            _ => {
+                let mut stmt = conn.prepare(
+                    "SELECT id, created_at, duration_sec, text, input_device, model, latency_ms, target_app, target_app_path
+                     FROM transcripts
+                     ORDER BY created_at DESC
+                     LIMIT ?1",
+                )?;
+                let rows = stmt.query_map(params![limit], row_to_transcript)?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()
+                    .context("collect transcript rows")
+            }
+        }
     }
 
     pub fn delete(&self, id: &str) -> Result<()> {
@@ -280,7 +307,13 @@ impl HistoryStore {
         conn.execute(
             "UPDATE dictionary SET pattern = ?2, replacement = ?3, case_sensitive = ?4, fuzzy = ?5
              WHERE id = ?1",
-            params![id, pattern, replacement, case_sensitive as i64, fuzzy as i64],
+            params![
+                id,
+                pattern,
+                replacement,
+                case_sensitive as i64,
+                fuzzy as i64
+            ],
         )?;
         Ok(())
     }
@@ -420,23 +453,20 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
     })
 }
 
-fn migrate(conn: &Connection) -> Result<()> {
-    let cols: Vec<String> = conn
+fn migrate_in_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let cols: Vec<String> = tx
         .prepare("PRAGMA table_info(transcripts)")?
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     if !cols.iter().any(|c| c == "latency_ms") {
-        conn.execute(
-            "ALTER TABLE transcripts ADD COLUMN latency_ms INTEGER",
-            [],
-        )?;
+        tx.execute("ALTER TABLE transcripts ADD COLUMN latency_ms INTEGER", [])?;
     }
     if !cols.iter().any(|c| c == "target_app") {
-        conn.execute("ALTER TABLE transcripts ADD COLUMN target_app TEXT", [])?;
+        tx.execute("ALTER TABLE transcripts ADD COLUMN target_app TEXT", [])?;
     }
     if !cols.iter().any(|c| c == "target_app_path") {
-        conn.execute(
+        tx.execute(
             "ALTER TABLE transcripts ADD COLUMN target_app_path TEXT",
             [],
         )?;
@@ -494,6 +524,9 @@ mod tests {
         let prev = store.update_transcript_text("t1", "call Kléma").unwrap();
         assert_eq!(prev.as_deref(), Some("call klema"));
         assert_eq!(store.get("t1").unwrap().unwrap().text, "call Kléma");
-        assert!(store.update_transcript_text("missing", "x").unwrap().is_none());
+        assert!(store
+            .update_transcript_text("missing", "x")
+            .unwrap()
+            .is_none());
     }
 }
