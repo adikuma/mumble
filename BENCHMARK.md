@@ -13,6 +13,10 @@ Local benchmark of the Parakeet-TDT-0.6B-v3 model Mumble ships (sherpa-onnx on O
 
 Published reference (NVIDIA, Open ASR Leaderboard): **1.93% WER** on full LibriSpeech test-clean. Our subset run should land in the same neighborhood, confirming the setup is correct.
 
+## Model
+
+[Parakeet-TDT-0.6B-v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) by NVIDIA, licensed CC-BY-4.0, trained on a multilingual ASR corpus dominated by English read and conversational speech (LibriSpeech, CommonVoice, VoxPopuli, MLS, plus NeMo internal data). Known limitations: English first with degraded accuracy on heavy accents, code switching, and overlapping speakers, no diarization, no timestamp tokens in the int8 build we ship, and the model emits punctuation and casing so downstream consumers must not assume lowercase normalized output.
+
 ## Method
 
 - **Model**: the same Parakeet-TDT-0.6B-v3 ONNX assets the app loads, run through the `sherpa-onnx` Python package. It wraps the same C++ core as the Rust `sherpa-rs` crate, so accuracy is identical to what Mumble ships.

@@ -1,5 +1,7 @@
 # cleanup
 
+> Status: scaffolding — implementation in progress
+
 Fine-tune a small local LLM (Qwen2.5-0.5B-Instruct) to clean Mumble dictation
 transcripts: remove fillers, repeats, and false starts, fix punctuation and
 casing, without rewriting or answering. Trains on a rented GPU over SSH and
