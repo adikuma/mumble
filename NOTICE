@@ -1,0 +1,64 @@
+Mumble
+Copyright 2026 Aditya Kumar
+
+This product includes software developed by third parties. Their copyrights,
+attributions, and licenses are listed below.
+
+--------------------------------------------------------------------------------
+Parakeet-TDT-0.6B-v3 (model weights)
+  Author: NVIDIA Corporation
+  License: Creative Commons Attribution 4.0 International (CC-BY-4.0)
+  Source: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+  Notes: Mumble downloads the int8 sherpa-onnx conversion of these weights
+         from https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
+         at first launch. Weights are not redistributed inside the Mumble
+         installer.
+
+--------------------------------------------------------------------------------
+sherpa-onnx
+  Author: k2-fsa contributors
+  License: Apache License 2.0
+  Source: https://github.com/k2-fsa/sherpa-onnx
+  Notes: Used via the sherpa-rs Rust bindings.
+
+--------------------------------------------------------------------------------
+ONNX Runtime
+  Author: Microsoft Corporation
+  License: MIT License
+  Source: https://github.com/microsoft/onnxruntime
+  Notes: Linked transitively via sherpa-onnx / sherpa-rs at build time.
+
+--------------------------------------------------------------------------------
+Tauri
+  Author: Tauri Programme within The Commons Conservancy
+  License: Apache License 2.0 OR MIT (dual)
+  Source: https://github.com/tauri-apps/tauri
+
+--------------------------------------------------------------------------------
+ort (Rust ONNX Runtime bindings)
+  Author: pyke and contributors
+  License: Apache License 2.0
+  Source: https://github.com/pykeio/ort
+
+--------------------------------------------------------------------------------
+shadcn/ui
+  Author: shadcn and contributors
+  License: MIT License
+  Source: https://github.com/shadcn-ui/ui
+  Notes: Primitive components in src/components/ui were adapted from this
+         project under the MIT license.
+
+--------------------------------------------------------------------------------
+Future component (not yet integrated)
+
+Qwen2.5-0.5B
+  Author: Alibaba Cloud
+  License: Apache License 2.0
+  Source: https://huggingface.co/Qwen/Qwen2.5-0.5B
+  Notes: A cleanup model based on Qwen2.5-0.5B is planned for the
+         models/cleanup pipeline. When integrated it will be redistributed
+         under Apache-2.0 in the same manner as Parakeet above.
+
+--------------------------------------------------------------------------------
+For the full list of transitive Rust and JavaScript dependencies and their
+respective licenses, see the lockfiles src-tauri/Cargo.lock and pnpm-lock.yaml.

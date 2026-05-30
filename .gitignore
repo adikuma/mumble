@@ -32,7 +32,7 @@ docs/superpowers/
 
 # opensrc - source code for packages
 opensrc/
-AGENTS.md
 
 # rust-analyzer cache (root)
 target/
+.audit-cache/
