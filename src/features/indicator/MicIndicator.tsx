@@ -49,32 +49,29 @@ export function MicIndicator({
 
 function pillClasses(className?: string) {
   return cn(
-    "inline-flex items-center gap-2.5 rounded-[12px] py-2 pr-4 pl-3.5",
+    "inline-flex items-center gap-2.5 rounded-xl border border-border bg-card py-2 pr-4 pl-3.5 shadow-lg",
     className,
   );
 }
 
 function pillStyle(variant: "light" | "dark"): React.CSSProperties {
+  // surface and border come from design tokens via tailwind classes on the
+  // wrapper. only the text color flips with variant since the indicator is
+  // not bound to the page theme.
   if (variant === "light") {
     return {
-      background: "linear-gradient(180deg, #ffffff 0%, #f7f7f8 100%)",
-      border: "1px solid rgba(0,0,0,0.08)",
-      boxShadow:
-        "0 12px 28px -12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.85)",
-      color: "var(--foreground)",
+      color: "hsl(var(--foreground))",
     };
   }
   return {
-    background: "linear-gradient(180deg, #212126 0%, #161619 100%)",
-    border: "1px solid rgba(255,255,255,0.09)",
-    boxShadow:
-      "0 14px 32px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.07)",
-    color: "#fafafa",
+    color: "hsl(var(--popover-foreground))",
   };
 }
 
 function dividerColor(variant: "light" | "dark") {
-  return variant === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
+  return variant === "dark"
+    ? "hsl(var(--foreground) / 0.18)"
+    : "hsl(var(--foreground) / 0.12)";
 }
 
 function RecordingPill({
@@ -91,11 +88,8 @@ function RecordingPill({
       <span
         className="size-[7px] shrink-0 rounded-full"
         style={{
-          background: variant === "dark" ? "#f87171" : "#ef4444",
-          boxShadow:
-            variant === "dark"
-              ? "0 0 0 4px rgba(248,113,113,0.18)"
-              : "0 0 0 4px rgba(239,68,68,0.14)",
+          background: "hsl(var(--destructive))",
+          boxShadow: "0 0 0 4px hsl(var(--destructive) / 0.18)",
         }}
       />
       <Waveform active={active} variant={variant} bars={bars} />
@@ -127,7 +121,7 @@ function StatusPill({
       <Loader2
         className="size-3.5 shrink-0 animate-spin"
         strokeWidth={2.25}
-        style={{ color: variant === "dark" ? "#9c91f5" : "#6d5fe8" }}
+        style={{ color: "hsl(var(--primary))" }}
       />
       <span className="text-[13px] font-medium tracking-tight">{label}…</span>
     </div>
@@ -169,6 +163,21 @@ function Waveform({
     Array.from({ length: bars }, () => 8),
   );
 
+  // keep the heights array length in sync with the bars prop using the
+  // adjusting state on prop change pattern from the react docs. tracking the
+  // previous bars via state avoids both setState in effect and ref mutation
+  // in render, which the project lint forbids.
+  const [prevBars, setPrevBars] = useState<number>(bars);
+  if (prevBars !== bars) {
+    setPrevBars(bars);
+    setHeights((prev) => {
+      if (prev.length === bars) return prev;
+      if (prev.length > bars) return prev.slice(prev.length - bars);
+      const pad = Array.from({ length: bars - prev.length }, () => 8);
+      return [...pad, ...prev];
+    });
+  }
+
   useEffect(() => {
     if (!active) return;
 
@@ -194,25 +203,53 @@ function Waveform({
       return () => clearInterval(id);
     }
 
-    const id = setInterval(() => {
+    // recursive settimeout so the next getmeter call is only scheduled after
+    // the prior one resolves. setinterval would pile up overlapping calls if
+    // the backend ever stalled. persistent failures get logged once.
+    let cancelled = false;
+    let timer: number | null = null;
+    let failures = 0;
+    let warned = false;
+
+    const tick = () => {
       getMeter()
-        .then(update)
-        .catch(() => {});
-    }, tickInterval);
-    return () => clearInterval(id);
+        .then((rms) => {
+          failures = 0;
+          if (cancelled) return;
+          update(rms);
+        })
+        .catch(() => {
+          failures += 1;
+          if (failures >= 5 && !warned) {
+            warned = true;
+            console.warn("getMeter failing persistently");
+          }
+        })
+        .finally(() => {
+          if (cancelled) return;
+          timer = window.setTimeout(tick, tickInterval);
+        });
+    };
+
+    tick();
+
+    return () => {
+      cancelled = true;
+      if (timer != null) clearTimeout(timer);
+    };
   }, [active]);
 
-  const barBackground =
-    variant === "dark"
-      ? "linear-gradient(180deg, #cfc9ff, #9c91f5)"
-      : "linear-gradient(180deg, #8b80f0, #6d5fe8)";
+  // waveform bars use the primary token so the indicator follows the brand
+  // accent in both light and dark variants.
+  const barBackground = "hsl(var(--primary))";
+  void variant;
 
   return (
     <div className="flex h-4 w-[60px] shrink-0 items-center gap-[2px]">
       {heights.map((h, i) => (
         <span
           key={i}
-          className="rounded-[2px] transition-[height] duration-50"
+          className="rounded-[2px] motion-safe:transition-[height] motion-safe:duration-75"
           style={{
             flex: 1,
             maxWidth: 2,

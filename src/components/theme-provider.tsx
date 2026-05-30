@@ -8,10 +8,17 @@ type ThemeProviderState = {
   setTheme: (theme: Theme) => void;
 };
 
-const systemMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+// resolve the system media query lazily so the module can be imported in
+// non-dom environments (ssr, test, vite prerender). returns null when there
+// is no window available.
+function getSystemMediaQuery(): MediaQueryList | null {
+  if (typeof window === "undefined" || !window.matchMedia) return null;
+  return window.matchMedia("(prefers-color-scheme: dark)");
+}
 
 function getSystemTheme(): "light" | "dark" {
-  return systemMediaQuery.matches ? "dark" : "light";
+  const mq = getSystemMediaQuery();
+  return mq?.matches ? "dark" : "light";
 }
 
 const ThemeProviderContext = createContext<ThemeProviderState>({
@@ -38,11 +45,13 @@ export function ThemeProvider({
   );
 
   useEffect(() => {
+    const mq = getSystemMediaQuery();
+    if (!mq) return;
     const handler = (e: MediaQueryListEvent) => {
       setSystemTheme(e.matches ? "dark" : "light");
     };
-    systemMediaQuery.addEventListener("change", handler);
-    return () => systemMediaQuery.removeEventListener("change", handler);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
   // keep theme in sync across windows. the indicator pill lives in its own

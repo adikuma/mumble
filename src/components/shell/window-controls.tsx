@@ -18,19 +18,25 @@ export function WindowControls() {
     win
       .isMaximized()
       .then(setMaximized)
-      .catch(() => {});
+      .catch((err) => {
+        console.warn("window-controls: isMaximized failed", err);
+      });
     let unlisten: (() => void) | undefined;
     win
       .onResized(() => {
         win
           .isMaximized()
           .then(setMaximized)
-          .catch(() => {});
+          .catch((err) => {
+            console.warn("window-controls: isMaximized failed", err);
+          });
       })
       .then((u) => {
         unlisten = u;
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn("window-controls: onResized failed", err);
+      });
     return () => {
       unlisten?.();
     };

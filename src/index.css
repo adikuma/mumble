@@ -97,7 +97,7 @@
   --card-foreground: 0 0% 9%;
 
   --popover: 38 28% 94.5%;
-  --popover-foreground: 240 10% 3.9%;
+  --popover-foreground: 0 0% 9%;
 
   --primary: 36 86% 58%;
   --primary-foreground: 30 45% 10%;
@@ -115,7 +115,6 @@
   --destructive-foreground: 0 0% 98%;
 
   --border: 36 20% 82%;
-  --border-strong: 36 16% 72%;
   --input: 36 20% 82%;
   --ring: 35 92% 52%;
 
@@ -155,7 +154,6 @@
   --destructive-foreground: 0 0% 98%;
 
   --border: 240 4% 19%;
-  --border-strong: 240 4% 26%;
   --input: 240 4% 18%;
   --ring: 258 76% 74%;
 
@@ -276,6 +274,24 @@ body.indicator-window #root {
     }
     100% {
       background-color: hsl(var(--primary) / 0);
+    }
+  }
+}
+
+/* honor the os reduced-motion preference. zeroes accordion animations, drops
+ * the highlight flash to an instant color swap, and disables the waveform
+ * height transition. components that want to opt in to motion should use the
+ * tailwind motion-safe variant (for example motion-safe:transition-[height]
+ * on the waveform bars). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --animate-accordion-down: none;
+    --animate-accordion-up: none;
+  }
+  @keyframes mumble-flash {
+    0%,
+    100% {
+      background-color: transparent;
     }
   }
 }
