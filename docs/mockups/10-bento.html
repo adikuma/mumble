@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mumble Insights · Bento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* warm cream page */
+    --page: #f6efe4;
+    --page-2: #f3e9d9;
+    --ink: #3a322a;
+    --ink-soft: #7c7163;
+    --ink-faint: #a89c8b;
+
+    /* warm pastel tints */
+    --butter: #fbe9a8;
+    --butter-2: #fdf2c9;
+    --sage: #cfe3c2;
+    --sage-2: #e2efd9;
+    --coral: #f8cdbb;
+    --coral-2: #fde0d4;
+    --amber: #f6c98e;
+    --amber-2: #fbe2bf;
+    --sky: #c6dcef;
+    --sky-2: #e0edf9;
+    --lilac: #ddd2ee;
+
+    /* accent strokes */
+    --amber-ink: #d98a2b;
+    --coral-ink: #e0683f;
+    --sage-ink: #5f9050;
+    --sky-ink: #4d82bd;
+    --butter-ink: #c79a1f;
+
+    --radius: 26px;
+    --radius-sm: 16px;
+    --shadow: 0 1px 2px rgba(80,60,30,.05), 0 10px 24px -12px rgba(120,90,40,.22);
+    --shadow-lift: 0 2px 4px rgba(80,60,30,.06), 0 22px 40px -16px rgba(120,90,40,.34);
+    font-synthesis: none;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(1100px 600px at 12% -8%, #fbf4e6 0%, rgba(251,244,230,0) 55%),
+      radial-gradient(900px 520px at 96% 4%, #f7ecdb 0%, rgba(247,236,219,0) 50%),
+      var(--page);
+    color: var(--ink);
+    font-family: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 46px 24px 72px;
+  }
+
+  /* header */
+  .top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 26px;
+    gap: 18px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+  }
+  .logo {
+    width: 46px; height: 46px;
+    border-radius: 14px;
+    background: linear-gradient(150deg, var(--amber) 0%, var(--coral) 100%);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 18px -8px rgba(224,104,63,.55), inset 0 1px 0 rgba(255,255,255,.6);
+    position: relative;
+  }
+  .logo svg { width: 24px; height: 24px; display: block; }
+  .brand h1 {
+    margin: 0;
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+  }
+  .brand .sub {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .pill-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fffdf7;
+    border: 1px solid rgba(180,150,90,.22);
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 14px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+  .pill-range .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--sage-ink);
+    box-shadow: 0 0 0 4px rgba(95,144,80,.18);
+  }
+
+  /* bento grid */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: 116px;
+    gap: 16px;
+  }
+
+  .tile {
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.55);
+    transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease;
+    will-change: transform;
+  }
+  .tile::after {
+    /* soft top sheen */
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 42%);
+    pointer-events: none;
+  }
+  .tile:hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-lift);
+  }
+
+  .t-butter { background: linear-gradient(160deg, var(--butter-2) 0%, var(--butter) 100%); }
+  .t-sage   { background: linear-gradient(160deg, var(--sage-2) 0%, var(--sage) 100%); }
+  .t-coral  { background: linear-gradient(160deg, var(--coral-2) 0%, var(--coral) 100%); }
+  .t-amber  { background: linear-gradient(160deg, var(--amber-2) 0%, var(--amber) 100%); }
+  .t-sky    { background: linear-gradient(160deg, var(--sky-2) 0%, var(--sky) 100%); }
+  .t-cream  { background: linear-gradient(160deg, #fffdf7 0%, #faf3e6 100%); }
+
+  /* spans */
+  .c2 { grid-column: span 2; }
+  .c3 { grid-column: span 3; }
+  .c4 { grid-column: span 4; }
+  .c6 { grid-column: span 6; }
+  .r1 { grid-row: span 1; }
+  .r2 { grid-row: span 2; }
+  .r3 { grid-row: span 3; }
+
+  /* tile internals */
+  .eyebrow {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 700;
+    color: var(--ink-soft);
+    display: flex; align-items: center; gap: 7px;
+    margin: 0 0 6px;
+    position: relative; z-index: 2;
+  }
+  .eyebrow .ic { font-size: 13px; }
+
+  .big {
+    font-size: 46px;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    line-height: 1;
+    position: relative; z-index: 2;
+  }
+  .big .unit {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-left: 4px;
+    letter-spacing: 0;
+  }
+  .cap {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-weight: 500;
+    margin-top: 6px;
+    position: relative; z-index: 2;
+  }
+
+  /* small stat layout */
+  .stat-sm { display: flex; flex-direction: column; height: 100%; }
+  .stat-sm .big { font-size: 34px; }
+  .stat-sm .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: auto; }
+
+  /* mini bars (dictations) */
+  .minibars { display: flex; align-items: flex-end; gap: 4px; height: 30px; }
+  .minibars span {
+    width: 7px; border-radius: 4px 4px 2px 2px;
+    background: var(--sky-ink);
+    opacity: .85;
+  }
+
+  /* dots (apps) */
+  .dots { display: grid; grid-template-columns: repeat(4, 9px); gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+  .dots i.on { background: var(--coral-ink); }
+  .dots i.off { background: rgba(224,104,63,.22); }
+
+  /* progress ring (latency) */
+  .ring { position: relative; width: 56px; height: 56px; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .lbl {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 11px; font-weight: 800; color: var(--sage-ink);
+  }
+
+  /* tiny gauge (time saved) */
+  .tinygauge { width: 64px; height: 34px; position: relative; }
+
+  /* hero trend tile */
+  .hero { display: flex; flex-direction: column; }
+  .hero-head { display: flex; align-items: flex-start; justify-content: space-between; position: relative; z-index: 3; }
+  .hero-stat { text-align: right; }
+  .hero-stat .num { font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+  .hero-stat .lab { font-size: 11.5px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+  .chartbox { position: relative; flex: 1; margin: 6px -8px -6px; min-height: 0; }
+  .chartbox svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .daylabels {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: var(--ink-faint); font-weight: 600;
+    padding: 2px 10px 0; position: relative; z-index: 2;
+  }
+
+  .dot-marker { transition: r .2s ease; cursor: pointer; }
+
+  .tooltip {
+    position: absolute;
+    background: #2f2820;
+    color: #fff6e6;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 11px;
+    border-radius: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 10px 22px -8px rgba(60,40,10,.55);
+    transform: translate(-50%, -118%);
+    z-index: 6;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  .tooltip::after {
+    content: "";
+    position: absolute; left: 50%; bottom: -5px;
+    width: 10px; height: 10px;
+    background: #2f2820;
+    transform: translateX(-50%) rotate(45deg);
+    border-radius: 2px;
+  }
+  .tooltip .accent { color: var(--amber); }
+
+  /* WPM gauge tall tile */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 4px; position: relative; z-index: 2; }
+  .gauge-arc { position: relative; width: 158px; height: 158px; }
+  .gauge-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .gauge-center .v { font-size: 50px; font-weight: 800; letter-spacing: -.03em; line-height: .9; }
+  .gauge-center .u { font-size: 12px; font-weight: 700; letter-spacing: .14em; color: var(--ink-soft); text-transform: uppercase; margin-top: 2px; }
+  .gauge-note {
+    font-size: 12.5px; color: var(--ink-soft); font-weight: 600; text-align: center;
+    max-width: 180px; line-height: 1.4;
+  }
+  .gauge-note b { color: var(--amber-ink); }
+
+  /* top words tile */
+  .words-list { display: flex; flex-direction: column; gap: 11px; margin-top: 12px; position: relative; z-index: 2; }
+  .word-row { display: flex; align-items: center; gap: 12px; }
+  .word-row .wname { font-size: 14px; font-weight: 700; width: 86px; flex: none; }
+  .word-row .wbar { flex: 1; height: 9px; border-radius: 999px; background: rgba(95,144,80,.16); overflow: hidden; }
+  .word-row .wbar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--sage-ink), #7fb061); }
+  .word-row .wct { font-size: 13px; font-weight: 700; color: var(--sage-ink); width: 18px; text-align: right; }
+
+  /* top apps tile */
+  .apps-list { display: flex; flex-direction: column; gap: 13px; margin-top: 12px; position: relative; z-index: 2; }
+  .app-row { display: flex; align-items: center; gap: 12px; }
+  .app-ico {
+    width: 30px; height: 30px; border-radius: 9px; flex: none;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .app-mid { flex: 1; min-width: 0; }
+  .app-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-bar { height: 7px; border-radius: 999px; background: rgba(77,130,189,.15); margin-top: 5px; overflow: hidden; }
+  .app-bar i { display: block; height: 100%; border-radius: 999px; }
+  .app-pct { font-size: 13px; font-weight: 800; flex: none; width: 34px; text-align: right; }
+
+  /* streak tile */
+  .streak { display: flex; flex-direction: column; height: 100%; align-items: flex-start; }
+  .flame { font-size: 30px; line-height: 1; filter: drop-shadow(0 4px 8px rgba(224,104,63,.4)); }
+  .streak .big { font-size: 40px; margin-top: auto; }
+  .streak-days { display: flex; gap: 6px; margin-top: 10px; position: relative; z-index: 2; }
+  .streak-days b {
+    width: 22px; height: 22px; border-radius: 7px;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .streak-days b.hot { background: var(--coral-ink); color: #fff; }
+  .streak-days b.cold { background: rgba(224,104,63,.16); color: var(--coral-ink); }
+
+  /* heatmap tile */
+  .heat-head { display: flex; align-items: baseline; justify-content: space-between; position: relative; z-index: 2; }
+  .heat-sub { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+  .heatmap {
+    margin-top: 14px;
+    display: grid;
+    grid-template-rows: repeat(7, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 3px;
+    position: relative; z-index: 2;
+  }
+  .heatmap span {
+    aspect-ratio: 1 / 1;
+    border-radius: 3px;
+    background: rgba(217,138,43,.10);
+  }
+  .heatmap span.l1 { background: rgba(217,138,43,.32); }
+  .heatmap span.l2 { background: rgba(217,138,43,.55); }
+  .heatmap span.l3 { background: rgba(217,138,43,.78); }
+  .heatmap span.l4 { background: var(--amber-ink); }
+  .heat-legend {
+    display: flex; align-items: center; gap: 6px; justify-content: flex-end;
+    margin-top: 12px; font-size: 11px; color: var(--ink-faint); font-weight: 600;
+    position: relative; z-index: 2;
+  }
+  .heat-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  .foot {
+    text-align: center; margin-top: 30px;
+    font-size: 12px; color: var(--ink-faint); font-weight: 500;
+  }
+  .foot b { color: var(--ink-soft); }
+
+  @media (max-width: 720px) {
+    .bento { grid-template-columns: repeat(2, 1fr); }
+    .c2, .c3, .c4, .c6 { grid-column: span 2; }
+    .r2, .r3 { grid-row: span 1; }
+    .gauge-arc { width: 140px; height: 140px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile, .tooltip, .dot-marker { transition: none !important; }
+    .tile:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <!-- header -->
+    <header class="top">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill="#fff" opacity=".92"/>
+            <path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22M8.5 22h7" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".92"/>
+          </svg>
+        </span>
+        <div>
+          <h1>Insights</h1>
+          <p class="sub">Your week of talking to the machine.</p>
+        </div>
+      </div>
+      <span class="pill-range"><span class="dot"></span>This week · Mon&ndash;Sun</span>
+    </header>
+
+    <!-- bento grid -->
+    <section class="bento">
+
+      <!-- HERO: week trend amber area chart -->
+      <div class="tile t-amber c4 r2 hero" id="heroTile">
+        <div class="hero-head">
+          <div>
+            <p class="eyebrow"><span class="ic">📈</span>Words this week</p>
+            <div class="big tnum">29<span class="unit">words</span></div>
+          </div>
+          <div class="hero-stat">
+            <div class="num tnum">Thu</div>
+            <div class="lab">busiest day</div>
+          </div>
+        </div>
+
+        <div class="chartbox" id="chartBox">
+          <svg viewBox="0 0 600 200" preserveAspectRatio="none" id="trendSvg">
+            <defs>
+              <linearGradient id="amberFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#e8902f" stop-opacity=".42"/>
+                <stop offset="100%" stop-color="#e8902f" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="lineShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#c9781f" flood-opacity="0.35"/>
+              </filter>
+            </defs>
+            <!-- gridlines -->
+            <g stroke="rgba(160,110,40,.16)" stroke-width="1">
+              <line x1="0" y1="50" x2="600" y2="50"/>
+              <line x1="0" y1="100" x2="600" y2="100"/>
+              <line x1="0" y1="150" x2="600" y2="150"/>
+            </g>
+            <path id="areaPath" fill="url(#amberFill)"></path>
+            <path id="linePath" fill="none" stroke="#d9821f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#lineShadow)"></path>
+            <g id="markers"></g>
+          </svg>
+          <div class="tooltip" id="tooltip" style="opacity:0;">
+            <span class="day">Thu</span> · <span class="accent val">8 words</span>
+          </div>
+        </div>
+        <div class="daylabels tnum">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+      </div>
+
+      <!-- WPM gauge tall tile -->
+      <div class="tile t-butter c2 r2">
+        <p class="eyebrow"><span class="ic">⚡</span>Speed</p>
+        <div class="gauge-wrap">
+          <div class="gauge-arc">
+            <svg viewBox="0 0 160 160">
+              <path d="M22 130 A 64 64 0 1 1 138 130" fill="none" stroke="rgba(199,154,31,.20)" stroke-width="14" stroke-linecap="round"/>
+              <path id="wpmArc" d="M22 130 A 64 64 0 1 1 138 130" fill="none" stroke="#d9a31a" stroke-width="14" stroke-linecap="round"/>
+            </svg>
+            <div class="gauge-center">
+              <span class="v tnum">92</span>
+              <span class="u">wpm</span>
+            </div>
+          </div>
+          <p class="gauge-note">Cruising at a <b>chatty</b> pace.</p>
+        </div>
+      </div>
+
+      <!-- total words headline -->
+      <div class="tile t-sage c2 r1 stat-sm">
+        <p class="eyebrow"><span class="ic">🗣️</span>You yapped</p>
+        <div class="row">
+          <div class="big tnum">21</div>
+          <div class="minibars" aria-hidden="true">
+            <span style="height:25%"></span>
+            <span style="height:62%"></span>
+            <span style="height:38%"></span>
+            <span style="height:100%"></span>
+            <span style="height:50%"></span>
+            <span style="height:14%"></span>
+            <span style="height:75%"></span>
+          </div>
+        </div>
+        <p class="cap">words spoken total</p>
+      </div>
+
+      <!-- dictations -->
+      <div class="tile t-sky c2 r1 stat-sm">
+        <p class="eyebrow"><span class="ic">🎙️</span>Dictations</p>
+        <div class="row">
+          <div class="big tnum">3</div>
+          <div class="minibars" aria-hidden="true">
+            <span style="height:60%; background:var(--sky-ink)"></span>
+            <span style="height:100%; background:var(--sky-ink)"></span>
+            <span style="height:45%; background:var(--sky-ink)"></span>
+          </div>
+        </div>
+        <p class="cap">sessions captured</p>
+      </div>
+
+      <!-- avg latency with ring -->
+      <div class="tile t-cream c2 r1 stat-sm">
+        <p class="eyebrow"><span class="ic">⏱️</span>Avg latency</p>
+        <div class="row">
+          <div class="big tnum">474<span class="unit">ms</span></div>
+          <div class="ring" aria-hidden="true">
+            <svg viewBox="0 0 56 56" width="56" height="56">
+              <circle cx="28" cy="28" r="23" fill="none" stroke="rgba(95,144,80,.18)" stroke-width="6"/>
+              <circle id="latRing" cx="28" cy="28" r="23" fill="none" stroke="#5f9050" stroke-width="6" stroke-linecap="round"/>
+            </svg>
+            <span class="lbl">snappy</span>
+          </div>
+        </div>
+        <p class="cap">speech to text</p>
+      </div>
+
+      <!-- apps used dots -->
+      <div class="tile t-coral c2 r1 stat-sm">
+        <p class="eyebrow"><span class="ic">🪟</span>Apps used</p>
+        <div class="row">
+          <div class="big tnum">8</div>
+          <div class="dots" aria-hidden="true">
+            <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+            <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+          </div>
+        </div>
+        <p class="cap">windows reached</p>
+      </div>
+
+      <!-- time saved tiny gauge -->
+      <div class="tile t-butter c2 r1 stat-sm">
+        <p class="eyebrow"><span class="ic">⌛</span>Time saved</p>
+        <div class="row">
+          <div class="big tnum">0:00<span class="unit">hr</span></div>
+          <div class="tinygauge" aria-hidden="true">
+            <svg viewBox="0 0 64 34" width="64" height="34">
+              <path d="M6 30 A 26 26 0 0 1 58 30" fill="none" stroke="rgba(199,154,31,.22)" stroke-width="7" stroke-linecap="round"/>
+              <path d="M6 30 A 26 26 0 0 1 9 18" fill="none" stroke="#d9a31a" stroke-width="7" stroke-linecap="round"/>
+              <circle cx="6" cy="30" r="3.5" fill="#d9a31a"/>
+            </svg>
+          </div>
+        </div>
+        <p class="cap">just warming up</p>
+      </div>
+
+      <!-- streak -->
+      <div class="tile t-coral c2 r2 streak">
+        <span class="flame">🔥</span>
+        <p class="eyebrow" style="margin-top:12px"><span class="ic">✨</span>Current streak</p>
+        <div class="big tnum">2<span class="unit">days</span></div>
+        <div class="streak-days tnum" aria-hidden="true">
+          <b class="hot">M</b>
+          <b class="hot">T</b>
+          <b class="cold">W</b>
+          <b class="cold">T</b>
+          <b class="cold">F</b>
+        </div>
+        <p class="cap" style="margin-top:10px">keep the fire lit</p>
+      </div>
+
+      <!-- top words -->
+      <div class="tile t-sage c4 r2">
+        <p class="eyebrow"><span class="ic">🏆</span>Top words</p>
+        <div class="words-list tnum">
+          <div class="word-row">
+            <span class="wname">exact</span>
+            <span class="wbar"><i style="width:100%"></i></span>
+            <span class="wct">3</span>
+          </div>
+          <div class="word-row">
+            <span class="wname">criminal</span>
+            <span class="wbar"><i style="width:33%"></i></span>
+            <span class="wct">1</span>
+          </div>
+          <div class="word-row">
+            <span class="wname">smooth</span>
+            <span class="wbar"><i style="width:33%"></i></span>
+            <span class="wct">1</span>
+          </div>
+          <div class="word-row">
+            <span class="wname">struck</span>
+            <span class="wbar"><i style="width:33%"></i></span>
+            <span class="wct">1</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- top apps -->
+      <div class="tile t-sky c3 r2">
+        <p class="eyebrow"><span class="ic">📊</span>Top apps</p>
+        <div class="apps-list tnum">
+          <div class="app-row">
+            <span class="app-ico" style="background:linear-gradient(150deg,#4d82bd,#356199)">W</span>
+            <div class="app-mid">
+              <div class="app-name">WindowsTerminal.exe</div>
+              <div class="app-bar"><i style="width:62%; background:var(--sky-ink)"></i></div>
+            </div>
+            <span class="app-pct" style="color:var(--sky-ink)">62%</span>
+          </div>
+          <div class="app-row">
+            <span class="app-ico" style="background:linear-gradient(150deg,#e0683f,#c44e29)">z</span>
+            <div class="app-mid">
+              <div class="app-name">zen.exe</div>
+              <div class="app-bar"><i style="width:11%; background:var(--coral-ink)"></i></div>
+            </div>
+            <span class="app-pct" style="color:var(--coral-ink)">11%</span>
+          </div>
+          <div class="app-row">
+            <span class="app-ico" style="background:linear-gradient(150deg,#5f9050,#477a39)">m</span>
+            <div class="app-mid">
+              <div class="app-name">mumble-scaffold.exe</div>
+              <div class="app-bar"><i style="width:9%; background:var(--sage-ink)"></i></div>
+            </div>
+            <span class="app-pct" style="color:var(--sage-ink)">9%</span>
+          </div>
+        </div>
+        <p class="cap" style="margin-top:12px">33 · 6 · 5 captures</p>
+      </div>
+
+      <!-- counts mini tile to balance row -->
+      <div class="tile t-butter c3 r2">
+        <p class="eyebrow"><span class="ic">📅</span>Activity</p>
+        <div class="heat-head" style="margin-top:2px">
+          <div class="big tnum" style="font-size:38px">52<span class="unit">wks</span></div>
+        </div>
+        <p class="cap" style="margin-bottom:8px">a year at a glance, one tap a day</p>
+        <div class="heatmap" id="heatmap" aria-label="52 week activity heatmap"></div>
+        <div class="heat-legend">
+          less
+          <i style="background:rgba(217,138,43,.10)"></i>
+          <i style="background:rgba(217,138,43,.32)"></i>
+          <i style="background:rgba(217,138,43,.55)"></i>
+          <i style="background:rgba(217,138,43,.78)"></i>
+          <i style="background:var(--amber-ink)"></i>
+          more
+        </div>
+      </div>
+
+    </section>
+
+    <p class="foot">Mumble keeps every number on <b>this device</b>. Nothing leaves your machine. 🔒</p>
+  </main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- week trend data (Mon..Sun) ----
+  var data = [2, 5, 3, 8, 4, 1, 6];
+  var labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  var W = 600, H = 200;
+  var padL = 14, padR = 14, padT = 24, padB = 16;
+  var maxV = 8; // matches busiest day
+  var innerW = W - padL - padR;
+  var innerH = H - padT - padB;
+
+  var pts = data.map(function (v, i) {
+    var x = padL + (data.length === 1 ? 0 : (innerW * i) / (data.length - 1));
+    var y = padT + innerH * (1 - v / maxV);
+    return { x: x, y: y, v: v, label: labels[i] };
+  });
+
+  // smooth path via catmull-rom to bezier
+  function smoothPath(p) {
+    if (p.length < 2) return "";
+    var d = "M " + p[0].x.toFixed(1) + " " + p[0].y.toFixed(1);
+    for (var i = 0; i < p.length - 1; i++) {
+      var p0 = p[i === 0 ? 0 : i - 1];
+      var p1 = p[i];
+      var p2 = p[i + 1];
+      var p3 = p[i + 2 < p.length ? i + 2 : p.length - 1];
+      var t = 0.18;
+      var c1x = p1.x + (p2.x - p0.x) * t;
+      var c1y = p1.y + (p2.y - p0.y) * t;
+      var c2x = p2.x - (p3.x - p1.x) * t;
+      var c2y = p2.y - (p3.y - p1.y) * t;
+      d += " C " + c1x.toFixed(1) + " " + c1y.toFixed(1) + ", " +
+                   c2x.toFixed(1) + " " + c2y.toFixed(1) + ", " +
+                   p2.x.toFixed(1) + " " + p2.y.toFixed(1);
+    }
+    return d;
+  }
+
+  var line = smoothPath(pts);
+  var area = line + " L " + pts[pts.length - 1].x.toFixed(1) + " " + (H - padB) +
+                    " L " + pts[0].x.toFixed(1) + " " + (H - padB) + " Z";
+
+  document.getElementById("linePath").setAttribute("d", line);
+  document.getElementById("areaPath").setAttribute("d", area);
+
+  // markers
+  var markersG = document.getElementById("markers");
+  var svgNS = "http://www.w3.org/2000/svg";
+  pts.forEach(function (p, i) {
+    var halo = document.createElementNS(svgNS, "circle");
+    halo.setAttribute("cx", p.x);
+    halo.setAttribute("cy", p.y);
+    halo.setAttribute("r", 9);
+    halo.setAttribute("fill", "#d9821f");
+    halo.setAttribute("opacity", "0.0");
+    markersG.appendChild(halo);
+
+    var c = document.createElementNS(svgNS, "circle");
+    c.setAttribute("class", "dot-marker");
+    c.setAttribute("cx", p.x);
+    c.setAttribute("cy", p.y);
+    c.setAttribute("r", i === 3 ? 6 : 4); // Thu emphasized by default
+    c.setAttribute("fill", "#ffffff");
+    c.setAttribute("stroke", "#d9821f");
+    c.setAttribute("stroke-width", "3");
+    c.dataset.idx = i;
+    markersG.appendChild(c);
+  });
+
+  // ---- tooltip ----
+  var tooltip = document.getElementById("tooltip");
+  var chartBox = document.getElementById("chartBox");
+  var dayEl = tooltip.querySelector(".day");
+  var valEl = tooltip.querySelector(".val");
+
+  function showTip(i) {
+    var p = pts[i];
+    // map svg coords -> box px (svg uses non-uniform scale, viewBox 600x200)
+    var rect = chartBox.getBoundingClientRect();
+    var px = (p.x / W) * rect.width;
+    var py = (p.y / H) * rect.height;
+    tooltip.style.left = px + "px";
+    tooltip.style.top = py + "px";
+    dayEl.textContent = p.label;
+    valEl.textContent = p.v + (p.v === 1 ? " word" : " words");
+    tooltip.style.opacity = "1";
+  }
+
+  function hideTip() {
+    // return to default Thu emphasis hint, fade out
+    tooltip.style.opacity = "0";
+  }
+
+  Array.prototype.forEach.call(markersG.querySelectorAll(".dot-marker"), function (c) {
+    var idx = parseInt(c.dataset.idx, 10);
+    function enter() {
+      c.setAttribute("r", 7);
+      showTip(idx);
+    }
+    function leave() {
+      c.setAttribute("r", idx === 3 ? 6 : 4);
+      hideTip();
+    }
+    c.addEventListener("mouseenter", enter);
+    c.addEventListener("mouseleave", leave);
+    c.addEventListener("focus", enter);
+    c.addEventListener("blur", leave);
+    c.setAttribute("tabindex", "0");
+  });
+
+  // show the floating Thu tooltip on load (the showcase moment)
+  window.requestAnimationFrame(function () {
+    showTip(3);
+  });
+
+  // ---- WPM gauge arc fill (92 of ~140 scale) ----
+  var wpmArc = document.getElementById("wpmArc");
+  var arcLen = wpmArc.getTotalLength();
+  var wpmFrac = Math.min(92 / 140, 1);
+  wpmArc.style.strokeDasharray = arcLen;
+  wpmArc.style.strokeDashoffset = arcLen * (1 - wpmFrac);
+
+  // ---- latency ring (lower is better, 474ms of 1000ms budget) ----
+  var latRing = document.getElementById("latRing");
+  var rLen = 2 * Math.PI * 23;
+  var latFrac = 1 - Math.min(474 / 1000, 1); // 0.526 filled = snappy
+  latRing.style.strokeDasharray = rLen;
+  latRing.style.strokeDashoffset = rLen * (1 - latFrac);
+
+  // ---- 52 week x 7 day heatmap, mostly empty, few recent active cells ----
+  var heat = document.getElementById("heatmap");
+  var totalCells = 52 * 7;
+  // active cells live near the end (recent). map week trend onto last week.
+  // last full column = current week (Mon..Sun): 2,5,3,8,4,1,6 -> levels
+  function level(v) {
+    if (v <= 0) return 0;
+    if (v <= 2) return 1;
+    if (v <= 4) return 2;
+    if (v <= 6) return 3;
+    return 4;
+  }
+  var recentLevels = {}; // index -> class
+  // current week occupies the final 7 cells (last column)
+  var weekVals = [2, 5, 3, 8, 4, 1, 6];
+  for (var d = 0; d < 7; d++) {
+    recentLevels[totalCells - 7 + d] = level(weekVals[d]);
+  }
+  // a couple of stray earlier active cells for texture
+  var strays = {};
+  strays[totalCells - 7 - 3] = 1;   // a few days before
+  strays[totalCells - 7 - 5] = 2;
+  strays[totalCells - 14 - 1] = 1;
+  strays[totalCells - 14 - 6] = 1;
+
+  for (var i = 0; i < totalCells; i++) {
+    var span = document.createElement("span");
+    var lv = 0;
+    if (recentLevels[i] != null) lv = recentLevels[i];
+    else if (strays[i] != null) lv = strays[i];
+    if (lv > 0) span.className = "l" + lv;
+    heat.appendChild(span);
+  }
+
+  // reposition tooltip on resize so it tracks the Thu point
+  window.addEventListener("resize", function () {
+    if (tooltip.style.opacity === "1") showTip(3);
+  });
+})();
+</script>
+</body>
+</html>
