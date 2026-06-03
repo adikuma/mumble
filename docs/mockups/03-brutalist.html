@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mumble // Insights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* neo-brutalist insights mockup for mumble. all numbers are fixed mock data. */
+  :root {
+    --ink: #111110;
+    --paper: #f4efe4;
+    --paper-2: #ece4d3;
+    --card: #fffdf7;
+    --amber: hsl(36 86% 58%);
+    --amber-deep: hsl(33 80% 48%);
+    --line: 3px;
+    --shadow: 6px 6px 0 var(--ink);
+    --shadow-lg: 10px 10px 0 var(--ink);
+    --shadow-amber: 6px 6px 0 var(--amber-deep);
+    --mono: "DM Mono", ui-monospace, monospace;
+    --sans: "Archivo", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--paper-2) 1px, transparent 1px),
+      linear-gradient(90deg, var(--paper-2) 1px, transparent 1px);
+    background-size: 26px 26px;
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  /* generic brutalist card */
+  .card {
+    background: var(--card);
+    border: var(--line) solid var(--ink);
+    box-shadow: var(--shadow);
+    position: relative;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .card.lift:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* mono boxed tag */
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    padding: 3px 7px;
+    display: inline-block;
+    line-height: 1;
+  }
+  .tag.amber { background: var(--amber); }
+  .tag.ink { background: var(--ink); color: var(--paper); }
+
+  /* ============ HEADER ============ */
+  .masthead {
+    background: var(--ink);
+    color: var(--paper);
+    border: var(--line) solid var(--ink);
+    box-shadow: var(--shadow-amber);
+    padding: 22px 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .logo-mark {
+    width: 46px;
+    height: 46px;
+    background: var(--amber);
+    border: 3px solid var(--paper);
+    display: grid;
+    place-items: center;
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 26px;
+    color: var(--ink);
+    transform: rotate(-4deg);
+  }
+  .brand h1 {
+    margin: 0;
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 30px;
+    letter-spacing: -.02em;
+    line-height: .95;
+    text-transform: uppercase;
+  }
+  .brand .sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--amber);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .masthead .right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .live {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .dot {
+    width: 9px; height: 9px;
+    background: var(--amber);
+    border: 2px solid var(--paper);
+    border-radius: 50%;
+    animation: blink 1.4s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* ============ HERO BIG STAT ============ */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 22px;
+    margin-bottom: 22px;
+  }
+  .wpm-card {
+    padding: 24px 26px 22px;
+    overflow: hidden;
+  }
+  .wpm-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      -45deg, transparent 0 16px, rgba(0,0,0,.03) 16px 18px);
+    pointer-events: none;
+  }
+  .wpm-card .label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    position: relative;
+  }
+  .wpm-big {
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 128px;
+    line-height: .82;
+    letter-spacing: -.04em;
+    margin: 6px 0 0;
+    position: relative;
+    -webkit-text-stroke: 0;
+  }
+  .wpm-big .unit {
+    display: block;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: .26em;
+    margin-top: 12px;
+    color: var(--amber-deep);
+    text-transform: uppercase;
+  }
+  .wpm-card .footer {
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    position: relative;
+  }
+
+  /* mini stat grid */
+  .mini-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .mini {
+    padding: 14px 14px 12px;
+  }
+  .mini .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6b6456;
+  }
+  .mini .v {
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 38px;
+    line-height: 1;
+    margin-top: 8px;
+    letter-spacing: -.02em;
+  }
+  .mini .v small {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--amber-deep);
+    letter-spacing: 0;
+  }
+  .mini.accent { background: var(--amber); }
+
+  /* ============ SECTION TITLES ============ */
+  .sec-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 34px 0 16px;
+  }
+  .sec-head h2 {
+    margin: 0;
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: -.01em;
+    text-transform: uppercase;
+  }
+  .sec-head .rule {
+    flex: 1;
+    height: 3px;
+    background: var(--ink);
+  }
+
+  /* ============ BAR CHART (words per day) ============ */
+  .chart-card { padding: 22px 24px 18px; }
+  .chart-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+  }
+  .chart-top h3 {
+    margin: 0;
+    font-weight: 800;
+    font-size: 17px;
+    text-transform: uppercase;
+    letter-spacing: -.01em;
+  }
+  .bars {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+    align-items: end;
+    height: 230px;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 0;
+  }
+  .bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 8px;
+  }
+  .bar {
+    width: 100%;
+    background: var(--amber);
+    border: 3px solid var(--ink);
+    border-bottom: none;
+    position: relative;
+    box-shadow: inset -4px 0 0 rgba(0,0,0,.12);
+    transition: transform .12s ease, background .12s ease;
+    cursor: default;
+  }
+  .bar:hover {
+    background: var(--ink);
+    transform: translateY(-4px);
+  }
+  .bar:hover .bar-val { color: var(--paper); background: var(--amber); }
+  .bar-val {
+    position: absolute;
+    top: -26px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 12px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 2px solid var(--ink);
+    padding: 1px 6px;
+    line-height: 1.2;
+  }
+  .bar-row-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .bar-row-labels span {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #6b6456;
+  }
+
+  /* streak ribbon */
+  .streak {
+    margin-top: 18px;
+    border: 3px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+  .streak .flames { display: flex; gap: 6px; align-items: center; }
+  .streak .flames .fl {
+    width: 26px; height: 26px;
+    background: var(--amber);
+    border: 2px solid var(--paper);
+    display: grid; place-items: center;
+    font-size: 15px;
+    transform: rotate(-6deg);
+  }
+  .streak .txt { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
+  .streak .num { font-weight: 900; font-family: var(--sans); font-size: 30px; color: var(--amber); }
+
+  /* ============ TWO COLUMN: words + apps ============ */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    align-items: start;
+  }
+  .list-card { padding: 20px 22px 18px; }
+  .list-card h3 {
+    margin: 0 0 16px;
+    font-weight: 800;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: -.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* top words as chunky chips */
+  .word-chips { display: flex; flex-direction: column; gap: 12px; }
+  .word-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 3px solid var(--ink);
+    background: var(--paper);
+    padding: 10px 12px;
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .word-chip:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--ink); }
+  .word-chip .w {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 19px;
+    letter-spacing: -.01em;
+  }
+  .word-chip.top { background: var(--amber); }
+  .word-chip .count {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 13px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 2px solid var(--ink);
+    padding: 2px 8px;
+  }
+  .word-chip.top .count { background: var(--paper); color: var(--ink); }
+
+  /* top apps as bars */
+  .app-row { margin-bottom: 16px; }
+  .app-row:last-child { margin-bottom: 0; }
+  .app-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .app-meta .name { font-weight: 500; color: var(--ink); }
+  .app-meta .pct { font-weight: 500; color: var(--amber-deep); }
+  .app-track {
+    height: 22px;
+    border: 3px solid var(--ink);
+    background: var(--paper);
+    position: relative;
+    overflow: hidden;
+  }
+  .app-fill {
+    height: 100%;
+    background: var(--amber);
+    border-right: 3px solid var(--ink);
+    background-image: repeating-linear-gradient(
+      45deg, transparent 0 8px, rgba(0,0,0,.10) 8px 10px);
+    display: flex;
+    align-items: center;
+    transition: filter .12s ease;
+  }
+  .app-row:hover .app-fill { filter: brightness(.85); }
+  .app-fill .ct {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink);
+    padding-right: 7px;
+  }
+
+  /* ============ HEATMAP ============ */
+  .heat-card { padding: 22px 24px 20px; margin-top: 22px; }
+  .heat-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .heat-top h3 { margin: 0; font-weight: 800; font-size: 17px; text-transform: uppercase; letter-spacing: -.01em; }
+  .heat-scroll { overflow-x: auto; padding-bottom: 6px; }
+  .heatmap {
+    display: grid;
+    grid-template-rows: repeat(7, 12px);
+    grid-auto-flow: column;
+    grid-auto-columns: 12px;
+    gap: 3px;
+    width: max-content;
+  }
+  .cell {
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--ink);
+    background: var(--card);
+  }
+  .cell.l0 { background: var(--card); }
+  .cell.l1 { background: hsl(36 86% 82%); }
+  .cell.l2 { background: hsl(36 86% 68%); }
+  .cell.l3 { background: var(--amber); }
+  .cell.l4 { background: var(--amber-deep); }
+  .heat-legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #6b6456;
+  }
+  .heat-legend .swatch {
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--ink);
+    display: inline-block;
+  }
+
+  /* footer strip */
+  .foot {
+    margin-top: 30px;
+    border: var(--line) solid var(--ink);
+    background: var(--amber);
+    box-shadow: var(--shadow);
+    padding: 16px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .04em;
+  }
+  .btn {
+    font-family: var(--sans);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 13px;
+    letter-spacing: .02em;
+    background: var(--ink);
+    color: var(--paper);
+    border: 3px solid var(--ink);
+    padding: 9px 16px;
+    box-shadow: 4px 4px 0 rgba(0,0,0,.35);
+    cursor: pointer;
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .btn:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 rgba(0,0,0,.45); }
+  .btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 rgba(0,0,0,.5); }
+
+  @media (max-width: 760px) {
+    .hero, .two-col { grid-template-columns: 1fr; }
+    .wpm-big { font-size: 96px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== MASTHEAD ===== -->
+  <header class="masthead">
+    <div class="brand">
+      <div class="logo-mark">M</div>
+      <div>
+        <h1>Insights</h1>
+        <div class="sub">Mumble // voice dictation</div>
+      </div>
+    </div>
+    <div class="right">
+      <span class="live"><span class="dot"></span> Local-first // tracking</span>
+      <span class="tag amber">All time</span>
+    </div>
+  </header>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div class="card lift wpm-card">
+      <div class="label-row">
+        <span class="tag ink">Words per minute</span>
+        <span class="tag">Peak pace</span>
+      </div>
+      <div class="wpm-big">92<span class="unit">WPM avg</span></div>
+      <div class="footer">
+        <span class="tag amber">21 words total</span>
+        <span class="tag">3 dictations</span>
+      </div>
+    </div>
+
+    <div class="mini-grid">
+      <div class="card lift mini">
+        <div class="k">Avg latency</div>
+        <div class="v">474<small> ms</small></div>
+      </div>
+      <div class="card lift mini">
+        <div class="k">Dictations</div>
+        <div class="v">3</div>
+      </div>
+      <div class="card lift mini accent">
+        <div class="k">Apps used</div>
+        <div class="v">8</div>
+      </div>
+      <div class="card lift mini">
+        <div class="k">Time saved</div>
+        <div class="v">0:00<small> hr</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== WORDS PER DAY ===== -->
+  <div class="sec-head">
+    <h2>This Week</h2>
+    <div class="rule"></div>
+    <span class="tag">Mon &rarr; Sun</span>
+  </div>
+
+  <section class="card lift chart-card">
+    <div class="chart-top">
+      <h3>Words per day</h3>
+      <span class="tag amber">Peak: 8</span>
+    </div>
+    <div class="bars" id="bars"></div>
+    <div class="bar-row-labels">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>
+      <span>Fri</span><span>Sat</span><span>Sun</span>
+    </div>
+
+    <div class="streak">
+      <div class="flames">
+        <span class="fl">&#9650;</span>
+        <span class="fl">&#9650;</span>
+      </div>
+      <div class="txt">Current streak holding strong</div>
+      <div><span class="num">2</span> <span class="txt">days</span></div>
+    </div>
+  </section>
+
+  <!-- ===== WORDS + APPS ===== -->
+  <div class="sec-head">
+    <h2>Breakdown</h2>
+    <div class="rule"></div>
+  </div>
+
+  <section class="two-col">
+    <!-- top words -->
+    <div class="card lift list-card">
+      <h3><span class="tag amber">A</span> Top words</h3>
+      <div class="word-chips">
+        <div class="word-chip top">
+          <span class="w">exact</span>
+          <span class="count">&times;3</span>
+        </div>
+        <div class="word-chip">
+          <span class="w">criminal</span>
+          <span class="count">&times;1</span>
+        </div>
+        <div class="word-chip">
+          <span class="w">smooth</span>
+          <span class="count">&times;1</span>
+        </div>
+        <div class="word-chip">
+          <span class="w">struck</span>
+          <span class="count">&times;1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- top apps -->
+    <div class="card lift list-card">
+      <h3><span class="tag amber">B</span> Top apps</h3>
+
+      <div class="app-row">
+        <div class="app-meta">
+          <span class="name">WindowsTerminal.exe</span>
+          <span class="pct">33 &middot; 62%</span>
+        </div>
+        <div class="app-track">
+          <div class="app-fill" style="width:62%"><span class="ct">62%</span></div>
+        </div>
+      </div>
+
+      <div class="app-row">
+        <div class="app-meta">
+          <span class="name">zen.exe</span>
+          <span class="pct">6 &middot; 11%</span>
+        </div>
+        <div class="app-track">
+          <div class="app-fill" style="width:11%"><span class="ct"></span></div>
+        </div>
+      </div>
+
+      <div class="app-row">
+        <div class="app-meta">
+          <span class="name">mumble-scaffold.exe</span>
+          <span class="pct">5 &middot; 9%</span>
+        </div>
+        <div class="app-track">
+          <div class="app-fill" style="width:9%"><span class="ct"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== HEATMAP ===== -->
+  <div class="sec-head">
+    <h2>Activity</h2>
+    <div class="rule"></div>
+    <span class="tag">52 weeks</span>
+  </div>
+
+  <section class="card lift heat-card">
+    <div class="heat-top">
+      <h3>Dictation heatmap</h3>
+      <span class="tag amber">Last active: today</span>
+    </div>
+    <div class="heat-scroll">
+      <div class="heatmap" id="heatmap"></div>
+    </div>
+    <div class="heat-legend">
+      <span>Less</span>
+      <span class="swatch l0"></span>
+      <span class="swatch l1"></span>
+      <span class="swatch l2"></span>
+      <span class="swatch l3"></span>
+      <span class="swatch l4"></span>
+      <span>More</span>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER STRIP ===== -->
+  <div class="foot">
+    <span>MUMBLE.EXE // LOCAL-FIRST // NOTHING LEAVES THIS MACHINE</span>
+    <button class="btn">Export stats &rarr;</button>
+  </div>
+
+</div>
+
+<script>
+  // words per day mon..sun, fixed mock values
+  var perDay = [2, 5, 3, 8, 4, 1, 6];
+  var maxDay = Math.max.apply(null, perDay);
+  var barsEl = document.getElementById("bars");
+  perDay.forEach(function (v) {
+    var col = document.createElement("div");
+    col.className = "bar-col";
+    var bar = document.createElement("div");
+    bar.className = "bar";
+    // scale height so the tallest bar nearly fills the track
+    var h = Math.max(8, Math.round((v / maxDay) * 92));
+    bar.style.height = h + "%";
+    var val = document.createElement("span");
+    val.className = "bar-val";
+    val.textContent = v;
+    bar.appendChild(val);
+    col.appendChild(bar);
+    barsEl.appendChild(col);
+  });
+
+  // build a 52 week x 7 day heatmap, mostly empty with a few recent active cells.
+  var weeks = 52;
+  var days = 7;
+  var heatEl = document.getElementById("heatmap");
+  // deterministic active cells in the last couple of weeks (recent = high column index)
+  // map of "week:day" -> level
+  var active = {
+    "51:1": 4, "51:2": 3, "51:3": 4, "51:4": 2,
+    "50:4": 2, "50:5": 1, "50:0": 1,
+    "49:2": 1, "49:6": 2,
+    "48:3": 1
+  };
+  for (var w = 0; w < weeks; w++) {
+    for (var d = 0; d < days; d++) {
+      var cell = document.createElement("div");
+      var key = w + ":" + d;
+      var lvl = active[key] || 0;
+      cell.className = "cell l" + lvl;
+      cell.title = lvl > 0 ? "active" : "no dictations";
+      heatEl.appendChild(cell);
+    }
+  }
+</script>
+</body>
+</html>
