@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mumble Insights · Glass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* warm gradient mesh anchors */
+    --amber: #f5b35a;
+    --peach: #f7a584;
+    --gold: #f7d488;
+    --pink: #f3a6b4;
+    --rose: #ef8fa6;
+
+    /* crisp warm ink */
+    --ink: #3c2f24;
+    --ink-soft: #6f5d4b;
+    --ink-faint: #9a8675;
+
+    /* accent strokes for charts */
+    --amber-ink: #d9852b;
+    --peach-ink: #e57a4f;
+    --gold-ink: #c79420;
+    --rose-ink: #d96a86;
+
+    /* glass surface */
+    --glass-fill: rgba(255, 252, 246, 0.46);
+    --glass-fill-soft: rgba(255, 252, 246, 0.30);
+    --glass-border: rgba(255, 255, 255, 0.62);
+    --glass-border-soft: rgba(255, 255, 255, 0.40);
+
+    --radius: 28px;
+    --radius-sm: 18px;
+
+    --shadow:
+      0 1px 1px rgba(120, 80, 40, 0.04),
+      0 18px 40px -22px rgba(150, 90, 50, 0.40),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    --shadow-lift:
+      0 2px 4px rgba(120, 80, 40, 0.06),
+      0 34px 60px -24px rgba(190, 110, 70, 0.50),
+      inset 0 1px 0 rgba(255, 255, 255, 0.78);
+
+    font-synthesis: none;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    color: var(--ink);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100%;
+  }
+
+  /* warm gradient mesh background */
+  body {
+    position: relative;
+    background:
+      radial-gradient(1200px 760px at 8% -6%, #ffe7c4 0%, rgba(255, 231, 196, 0) 56%),
+      radial-gradient(1000px 720px at 96% 2%, #ffd2b0 0%, rgba(255, 210, 176, 0) 52%),
+      radial-gradient(1100px 900px at 82% 96%, #ffc8d6 0%, rgba(255, 200, 214, 0) 55%),
+      radial-gradient(900px 760px at 14% 100%, #ffe2a8 0%, rgba(255, 226, 168, 0) 52%),
+      linear-gradient(160deg, #fff3df 0%, #ffe9d6 38%, #ffe3df 72%, #ffeede 100%);
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+
+  /* floating blurred orbs for depth */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform;
+  }
+  .orb.a { width: 420px; height: 420px; left: -120px; top: -60px;
+    background: radial-gradient(circle at 30% 30%, var(--gold), rgba(247,212,136,0)); animation: float1 19s ease-in-out infinite; }
+  .orb.b { width: 380px; height: 380px; right: -110px; top: 120px;
+    background: radial-gradient(circle at 40% 40%, var(--peach), rgba(247,165,132,0)); animation: float2 23s ease-in-out infinite; }
+  .orb.c { width: 460px; height: 460px; left: 18%; bottom: -180px;
+    background: radial-gradient(circle at 50% 50%, var(--pink), rgba(243,166,180,0)); animation: float3 27s ease-in-out infinite; }
+  .orb.d { width: 300px; height: 300px; right: 22%; bottom: 4%;
+    background: radial-gradient(circle at 40% 40%, var(--amber), rgba(245,179,90,0)); opacity: 0.40; animation: float1 21s ease-in-out infinite reverse; }
+
+  @keyframes float1 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(40px, 32px); } }
+  @keyframes float2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-36px, 44px); } }
+  @keyframes float3 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px, -38px); } }
+
+  .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 52px 24px 80px;
+  }
+
+  /* ---------- glass card base ---------- */
+  .glass {
+    position: relative;
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    overflow: hidden;
+    transition: box-shadow .45s cubic-bezier(.2,.7,.3,1), transform .45s cubic-bezier(.2,.7,.3,1), border-color .45s ease;
+  }
+  /* soft inner highlight sweep at the top edge */
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(165deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.06) 26%, rgba(255,255,255,0) 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glass > * { position: relative; z-index: 1; }
+
+  /* hover: soft warm glow */
+  .glass.hoverable:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.85);
+    box-shadow:
+      var(--shadow-lift),
+      0 0 0 1px rgba(255,255,255,0.4),
+      0 0 44px -6px rgba(245, 160, 110, 0.55);
+  }
+
+  /* ---------- header ---------- */
+  .top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 26px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 50px; height: 50px;
+    border-radius: 16px;
+    background: linear-gradient(150deg, var(--gold) 0%, var(--peach) 55%, var(--rose) 100%);
+    display: grid; place-items: center;
+    box-shadow: 0 10px 22px -8px rgba(229,122,79,0.6), inset 0 1px 0 rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .logo svg { width: 26px; height: 26px; display: block; }
+  .brand h1 { margin: 0; font-size: 25px; font-weight: 800; letter-spacing: -.025em; }
+  .brand .sub { margin: 3px 0 0; font-size: 13.5px; color: var(--ink-soft); font-weight: 500; }
+
+  .pill-range {
+    display: inline-flex; align-items: center; gap: 9px;
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-border);
+    color: var(--ink-soft);
+    font-size: 13px; font-weight: 600;
+    padding: 10px 15px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+  }
+  .pill-range .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--peach-ink);
+    box-shadow: 0 0 0 4px rgba(229,122,79,0.20);
+  }
+
+  /* ---------- stat grid ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .stat { padding: 20px 20px 18px; }
+  .stat .eyebrow {
+    display: flex; align-items: center; gap: 7px;
+    margin: 0 0 12px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .stat .eyebrow .ic {
+    width: 22px; height: 22px; border-radius: 8px;
+    display: grid; place-items: center; font-size: 12px;
+    background: rgba(255,255,255,0.55);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 6px -3px rgba(160,100,60,0.4);
+  }
+  .stat .big {
+    font-size: 38px; font-weight: 800; letter-spacing: -.03em; line-height: 1;
+    color: var(--ink);
+  }
+  .stat .unit { font-size: 17px; font-weight: 600; color: var(--ink-faint); margin-left: 3px; letter-spacing: -.01em; }
+  .stat .meta { margin: 9px 0 0; font-size: 12.5px; color: var(--ink-soft); font-weight: 500; }
+
+  /* hero stat (wpm) spans + has chart accent */
+  .stat.hero { grid-column: span 1; }
+  .stat.hero .big { font-size: 46px;
+    background: linear-gradient(120deg, var(--peach-ink), var(--amber-ink) 55%, var(--gold-ink));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* ---------- panels row ---------- */
+  .panel { padding: 22px 22px 20px; }
+  .panel-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 16px; gap: 12px;
+  }
+  .panel-head h2 { margin: 0; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; }
+  .panel-head .hint { font-size: 12px; color: var(--ink-faint); font-weight: 500; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* ---------- words per day bar chart ---------- */
+  .chart { width: 100%; display: block; overflow: visible; }
+  .bar-rect { transition: filter .3s ease, transform .3s ease; transform-box: fill-box; transform-origin: bottom; cursor: pointer; }
+  .bar-rect:hover { filter: drop-shadow(0 6px 14px rgba(229,122,79,0.5)); transform: scaleY(1.04); }
+  .axis-lbl { font-size: 11px; fill: var(--ink-faint); font-weight: 600; }
+  .grid-line { stroke: rgba(150,110,70,0.13); stroke-width: 1; }
+  .area-stroke { stroke: var(--peach-ink); stroke-width: 2.5; fill: none; filter: drop-shadow(0 0 6px rgba(229,122,79,0.55)); }
+
+  /* ---------- streak ---------- */
+  .streak .big { font-size: 44px; }
+  .streak-days { display: flex; gap: 7px; margin-top: 16px; }
+  .streak-days b {
+    width: 30px; height: 30px; border-radius: 10px;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700; font-style: normal;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .streak-days b.hot {
+    background: linear-gradient(150deg, var(--peach), var(--rose));
+    color: #fff; box-shadow: 0 6px 14px -5px rgba(229,122,79,0.7), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .streak-days b.cold { background: rgba(255,255,255,0.40); color: var(--ink-faint); }
+
+  /* ---------- top words ---------- */
+  .wlist { display: flex; flex-direction: column; gap: 12px; }
+  .wrow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+  .wrow .word { font-size: 14px; font-weight: 600; }
+  .wrow .track {
+    height: 9px; border-radius: 999px;
+    background: rgba(255,255,255,0.35);
+    overflow: hidden; box-shadow: inset 0 1px 2px rgba(150,100,60,0.12);
+  }
+  .wrow .fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--gold) 0%, var(--peach) 60%, var(--rose) 100%);
+    box-shadow: 0 0 10px rgba(245,179,90,0.6);
+  }
+  .wrow .count { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+
+  /* ---------- top apps ---------- */
+  .alist { display: flex; flex-direction: column; gap: 14px; }
+  .arow { display: flex; flex-direction: column; gap: 7px; }
+  .arow .line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .arow .app { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; }
+  .arow .swatch { width: 11px; height: 11px; border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); }
+  .arow .nums { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+  .arow .nums b { color: var(--ink); }
+  .arow .track { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.35); overflow: hidden; box-shadow: inset 0 1px 2px rgba(150,100,60,0.12); }
+  .arow .fill { height: 100%; border-radius: 999px; box-shadow: 0 0 8px rgba(245,179,90,0.45); }
+
+  /* ---------- heatmap ---------- */
+  .heat-wrap { overflow-x: auto; padding-bottom: 4px; }
+  .heatmap {
+    display: grid;
+    grid-template-rows: repeat(7, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 3px;
+    min-width: 720px;
+  }
+  .heatmap .cell {
+    width: 100%; aspect-ratio: 1;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.32);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
+    transition: transform .18s ease, box-shadow .18s ease;
+    cursor: default;
+  }
+  .heatmap .cell.l1 { background: rgba(245,179,90,0.40); }
+  .heatmap .cell.l2 { background: rgba(245,140,90,0.62); }
+  .heatmap .cell.l3 { background: rgba(229,122,79,0.85); }
+  .heatmap .cell.l4 { background: linear-gradient(150deg, var(--peach-ink), var(--rose-ink)); }
+  .heatmap .cell.lit { cursor: pointer; }
+  .heatmap .cell.lit:hover { transform: scale(1.5); box-shadow: 0 4px 12px rgba(229,122,79,0.55), inset 0 0 0 1px rgba(255,255,255,0.6); }
+
+  .legend { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-faint); font-weight: 600; }
+  .legend .swatches { display: flex; gap: 4px; }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; background: rgba(255,255,255,0.32); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); }
+  .legend .sw.l1 { background: rgba(245,179,90,0.40); }
+  .legend .sw.l2 { background: rgba(245,140,90,0.62); }
+  .legend .sw.l3 { background: rgba(229,122,79,0.85); }
+  .legend .sw.l4 { background: linear-gradient(150deg, var(--peach-ink), var(--rose-ink)); }
+
+  /* ---------- tooltip ---------- */
+  .tooltip {
+    position: fixed;
+    z-index: 50;
+    transform: translate(-50%, -116%);
+    background: rgba(60, 47, 36, 0.92);
+    color: #fff7ef;
+    border: 1px solid rgba(255,255,255,0.16);
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 12.5px; font-weight: 600;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .16s ease;
+    box-shadow: 0 14px 32px -10px rgba(120,70,40,0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    white-space: nowrap;
+  }
+  .tooltip .accent { color: var(--gold); font-weight: 800; }
+  .tooltip::after {
+    content: ""; position: absolute;
+    left: 50%; bottom: -5px; transform: translateX(-50%) rotate(45deg);
+    width: 9px; height: 9px;
+    background: rgba(60, 47, 36, 0.92);
+    border-right: 1px solid rgba(255,255,255,0.16);
+    border-bottom: 1px solid rgba(255,255,255,0.16);
+  }
+
+  .foot {
+    margin-top: 22px;
+    text-align: center;
+    font-size: 12px; color: var(--ink-faint); font-weight: 500;
+  }
+  .foot b { color: var(--ink-soft); font-weight: 700; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none !important; }
+    .glass, .bar-rect, .heatmap .cell, .tooltip { transition: none !important; }
+  }
+
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="orb a"></div>
+  <div class="orb b"></div>
+  <div class="orb c"></div>
+  <div class="orb d"></div>
+
+  <div class="wrap">
+    <!-- header -->
+    <header class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8.5" y="2.5" width="7" height="12" rx="3.5" fill="#fff" fill-opacity="0.95"/>
+            <path d="M5 11a7 7 0 0 0 14 0" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M12 18v3.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Insights</h1>
+          <p class="sub">Your voice, by the numbers</p>
+        </div>
+      </div>
+      <div class="pill-range">
+        <span class="dot"></span>
+        Last 7 days
+      </div>
+    </header>
+
+    <!-- top stat row -->
+    <section class="stats">
+      <div class="glass stat hero hoverable">
+        <p class="eyebrow"><span class="ic">⚡</span>Words per minute</p>
+        <div><span class="big tnum">92</span></div>
+        <p class="meta">Above your typing pace</p>
+      </div>
+      <div class="glass stat hoverable">
+        <p class="eyebrow"><span class="ic">✍️</span>Total words</p>
+        <div><span class="big tnum">21</span></div>
+        <p class="meta">across all dictations</p>
+      </div>
+      <div class="glass stat hoverable">
+        <p class="eyebrow"><span class="ic">🎙️</span>Dictations</p>
+        <div><span class="big tnum">3</span></div>
+        <p class="meta">push to talk sessions</p>
+      </div>
+      <div class="glass stat hoverable">
+        <p class="eyebrow"><span class="ic">⏱️</span>Avg latency</p>
+        <div><span class="big tnum">474</span><span class="unit">ms</span></div>
+        <p class="meta">speech to text</p>
+      </div>
+      <div class="glass stat hoverable">
+        <p class="eyebrow"><span class="ic">🪟</span>Apps used</p>
+        <div><span class="big tnum">8</span></div>
+        <p class="meta">distinct windows</p>
+      </div>
+      <div class="glass stat hoverable">
+        <p class="eyebrow"><span class="ic">⌛</span>Time saved</p>
+        <div><span class="big tnum">0:00</span><span class="unit">hr</span></div>
+        <p class="meta">vs typing speed</p>
+      </div>
+    </section>
+
+    <!-- words per day + streak -->
+    <section class="two-col">
+      <div class="glass panel hoverable">
+        <div class="panel-head">
+          <h2>Words per day</h2>
+          <span class="hint">Mon – Sun</span>
+        </div>
+        <svg class="chart" id="wpdChart" viewBox="0 0 520 220" role="img" aria-label="Words per day bar chart">
+          <defs>
+            <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f7d488"/>
+              <stop offset="55%" stop-color="#f7a584"/>
+              <stop offset="100%" stop-color="#ef8fa6"/>
+            </linearGradient>
+            <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(247,165,132,0.34)"/>
+              <stop offset="100%" stop-color="rgba(247,165,132,0)"/>
+            </linearGradient>
+          </defs>
+          <!-- grid + bars injected by js -->
+        </svg>
+      </div>
+
+      <div class="glass panel streak hoverable">
+        <div class="panel-head">
+          <h2>Current streak</h2>
+          <span class="hint">🔥</span>
+        </div>
+        <div><span class="big tnum">2</span><span class="unit">days</span></div>
+        <p class="meta" style="margin:9px 0 0;font-size:12.5px;color:var(--ink-soft);font-weight:500;">Keep talking to grow it</p>
+        <div class="streak-days tnum" aria-hidden="true">
+          <b class="cold">M</b>
+          <b class="cold">T</b>
+          <b class="cold">W</b>
+          <b class="cold">T</b>
+          <b class="cold">F</b>
+          <b class="hot">S</b>
+          <b class="hot">S</b>
+        </div>
+      </div>
+    </section>
+
+    <!-- top words + top apps -->
+    <section class="two-col" style="grid-template-columns:1fr 1.3fr;">
+      <div class="glass panel hoverable">
+        <div class="panel-head">
+          <h2>Top words</h2>
+          <span class="hint">most spoken</span>
+        </div>
+        <div class="wlist" id="wordList"></div>
+      </div>
+
+      <div class="glass panel hoverable">
+        <div class="panel-head">
+          <h2>Top apps</h2>
+          <span class="hint">where you dictate</span>
+        </div>
+        <div class="alist" id="appList"></div>
+      </div>
+    </section>
+
+    <!-- heatmap -->
+    <section class="glass panel hoverable">
+      <div class="panel-head">
+        <h2>Activity</h2>
+        <div class="legend">
+          <span>Less</span>
+          <div class="swatches">
+            <span class="sw"></span><span class="sw l1"></span><span class="sw l2"></span><span class="sw l3"></span><span class="sw l4"></span>
+          </div>
+          <span>More</span>
+        </div>
+      </div>
+      <div class="heat-wrap">
+        <div class="heatmap" id="heatmap" aria-label="52 week by 7 day activity heatmap"></div>
+      </div>
+    </section>
+
+    <p class="foot">Mumble runs <b>fully local</b> on your machine. Nothing leaves this Windows PC.</p>
+  </div>
+
+  <!-- floating tooltip -->
+  <div class="tooltip" id="tooltip"><span class="accent" id="tipVal"></span> <span id="tipLbl"></span></div>
+
+<script>
+  (function () {
+    var tooltip = document.getElementById("tooltip");
+    var tipVal = document.getElementById("tipVal");
+    var tipLbl = document.getElementById("tipLbl");
+
+    function showTip(x, y, val, lbl) {
+      tipVal.textContent = val;
+      tipLbl.textContent = lbl;
+      tooltip.style.left = x + "px";
+      tooltip.style.top = y + "px";
+      tooltip.style.opacity = "1";
+    }
+    function hideTip() { tooltip.style.opacity = "0"; }
+
+    // ---- words per day bar chart ----
+    var wpd = [
+      { d: "Mon", v: 2 }, { d: "Tue", v: 5 }, { d: "Wed", v: 3 },
+      { d: "Thu", v: 8 }, { d: "Fri", v: 4 }, { d: "Sat", v: 1 }, { d: "Sun", v: 6 }
+    ];
+    var svgNS = "http://www.w3.org/2000/svg";
+    var chart = document.getElementById("wpdChart");
+    var W = 520, H = 220, padL = 30, padR = 14, padT = 14, padB = 30;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var maxV = 8;
+
+    // gridlines
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + (plotH * g / 4);
+      var line = document.createElementNS(svgNS, "line");
+      line.setAttribute("class", "grid-line");
+      line.setAttribute("x1", padL); line.setAttribute("x2", W - padR);
+      line.setAttribute("y1", gy); line.setAttribute("y2", gy);
+      chart.appendChild(line);
+    }
+
+    var slot = plotW / wpd.length;
+    var barW = slot * 0.52;
+    var centers = [];
+
+    // smooth glow line connecting the tops
+    var linePts = [];
+    wpd.forEach(function (item, i) {
+      var cx = padL + slot * i + slot / 2;
+      var bh = (item.v / maxV) * plotH;
+      var by = padT + plotH - bh;
+      centers.push(cx);
+      linePts.push([cx, by]);
+    });
+
+    // area under line
+    var areaD = "M " + linePts[0][0] + " " + (padT + plotH);
+    linePts.forEach(function (p) { areaD += " L " + p[0] + " " + p[1]; });
+    areaD += " L " + linePts[linePts.length - 1][0] + " " + (padT + plotH) + " Z";
+    var area = document.createElementNS(svgNS, "path");
+    area.setAttribute("d", areaD);
+    area.setAttribute("fill", "url(#areaFill)");
+    chart.appendChild(area);
+
+    // bars
+    wpd.forEach(function (item, i) {
+      var cx = centers[i];
+      var bh = (item.v / maxV) * plotH;
+      var by = padT + plotH - bh;
+      var rect = document.createElementNS(svgNS, "rect");
+      rect.setAttribute("class", "bar-rect");
+      rect.setAttribute("x", cx - barW / 2);
+      rect.setAttribute("y", by);
+      rect.setAttribute("width", barW);
+      rect.setAttribute("height", Math.max(bh, 3));
+      rect.setAttribute("rx", 7);
+      rect.setAttribute("fill", "url(#barGrad)");
+      (function (it) {
+        rect.addEventListener("mousemove", function (e) {
+          showTip(e.clientX, e.clientY, it.v + (it.v === 1 ? " word" : " words"), "on " + it.d);
+        });
+        rect.addEventListener("mouseleave", hideTip);
+      })(item);
+      chart.appendChild(rect);
+
+      // x label
+      var t = document.createElementNS(svgNS, "text");
+      t.setAttribute("class", "axis-lbl");
+      t.setAttribute("x", cx);
+      t.setAttribute("y", H - 9);
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = item.d;
+      chart.appendChild(t);
+    });
+
+    // glowing stroke over the tops
+    var strokeD = "M " + linePts[0][0] + " " + linePts[0][1];
+    linePts.forEach(function (p, i) { if (i > 0) strokeD += " L " + p[0] + " " + p[1]; });
+    var stroke = document.createElementNS(svgNS, "path");
+    stroke.setAttribute("d", strokeD);
+    stroke.setAttribute("class", "area-stroke");
+    chart.appendChild(stroke);
+
+    // ---- top words ----
+    var words = [
+      { w: "exact", c: 3 }, { w: "criminal", c: 1 }, { w: "smooth", c: 1 }, { w: "struck", c: 1 }
+    ];
+    var wordMax = 3;
+    var wl = document.getElementById("wordList");
+    words.forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "wrow";
+      row.innerHTML =
+        '<span class="word">' + item.w + '</span>' +
+        '<div class="track"><div class="fill" style="width:' + (item.c / wordMax * 100) + '%"></div></div>' +
+        '<span class="count tnum">' + item.c + '</span>';
+      wl.appendChild(row);
+    });
+
+    // ---- top apps ----
+    var apps = [
+      { a: "WindowsTerminal.exe", n: 33, p: 62, color: "linear-gradient(90deg,#f5b35a,#e57a4f)" },
+      { a: "zen.exe", n: 6, p: 11, color: "linear-gradient(90deg,#f7d488,#f3a6b4)" },
+      { a: "mumble-scaffold.exe", n: 5, p: 9, color: "linear-gradient(90deg,#f7a584,#ef8fa6)" }
+    ];
+    var swatchColors = ["#e57a4f", "#f3a6b4", "#ef8fa6"];
+    var al = document.getElementById("appList");
+    apps.forEach(function (item, i) {
+      var row = document.createElement("div");
+      row.className = "arow";
+      row.innerHTML =
+        '<div class="line">' +
+          '<span class="app"><span class="swatch" style="background:' + swatchColors[i] + '"></span>' + item.a + '</span>' +
+          '<span class="nums"><b class="tnum">' + item.n + '</b> · ' + item.p + '%</span>' +
+        '</div>' +
+        '<div class="track"><div class="fill" style="width:' + item.p + '%;background:' + item.color + '"></div></div>';
+      al.appendChild(row);
+    });
+
+    // ---- 52 week x 7 day heatmap, mostly empty, few recent active cells ----
+    var weeks = 52, days = 7;
+    var heat = document.getElementById("heatmap");
+    var dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    // active cells anchored to the most recent weeks (bottom right region)
+    // map of "week,day" -> level
+    var active = {
+      "49,5": 1, "50,3": 2, "50,5": 1,
+      "51,0": 1, "51,3": 3, "51,4": 2, "51,6": 4,
+      "52,1": 2, "52,3": 1, "52,5": 2
+    };
+
+    for (var wk = 0; wk < weeks; wk++) {
+      for (var dy = 0; dy < days; dy++) {
+        var cell = document.createElement("div");
+        var key = (wk + 1) + "," + dy;
+        var lvl = active[key];
+        cell.className = "cell" + (lvl ? " l" + lvl + " lit" : "");
+        if (lvl) {
+          var weeksAgo = weeks - 1 - wk;
+          var label = weeksAgo === 0 ? "this week" : weeksAgo + (weeksAgo === 1 ? " week ago" : " weeks ago");
+          (function (lv, lbl, dn) {
+            cell.addEventListener("mousemove", function (e) {
+              showTip(e.clientX, e.clientY, lv + (lv === 1 ? " dictation" : " dictations"), dn + " · " + lbl);
+            });
+            cell.addEventListener("mouseleave", hideTip);
+          })(lvl, label, dayNames[dy]);
+        }
+        heat.appendChild(cell);
+      }
+    }
+
+    // showcase moment: briefly reveal the Thu peak tooltip on load
+    window.addEventListener("load", function () {
+      var bars = chart.querySelectorAll(".bar-rect");
+      if (!bars.length) return;
+      var peak = bars[3]; // Thu = 8
+      var r = peak.getBoundingClientRect();
+      showTip(r.left + r.width / 2, r.top, "8 words", "on Thu");
+      setTimeout(hideTip, 2200);
+    });
+  })();
+</script>
+</body>
+</html>
