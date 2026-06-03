@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mumble Insights — Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* warm amber + cream base */
+    --cream: #fdf6e9;
+    --cream-2: #fbeed6;
+    --paper: #fffdf8;
+    --ink: #3a2e1f;
+    --ink-soft: #6f5d44;
+    --ink-faint: #9b8666;
+    --line: #ecdcbd;
+    --line-soft: #f2e7cf;
+
+    --amber: #f5a623;
+    --amber-deep: #e8870b;
+    --amber-glow: #ffce6e;
+    --ember: #ff6b2c;
+    --ember-deep: #ef4f1a;
+
+    --gold: #e6b422;
+    --gold-light: #ffd866;
+    --gold-deep: #b8860b;
+
+    --teal: #2f9e8f;
+    --violet: #7c5cff;
+
+    --shadow-sm: 0 1px 2px rgba(90, 60, 20, 0.08);
+    --shadow-md: 0 8px 24px -10px rgba(120, 80, 25, 0.30);
+    --shadow-lg: 0 22px 50px -22px rgba(120, 75, 20, 0.45);
+    --radius: 22px;
+    --radius-lg: 28px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 18% -8%, #fff3d8 0%, rgba(255,243,216,0) 55%),
+      radial-gradient(1000px 500px at 100% 0%, #ffe7c4 0%, rgba(255,231,196,0) 50%),
+      radial-gradient(900px 700px at 50% 120%, #fbe6c0 0%, rgba(251,230,192,0) 60%),
+      var(--cream);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+
+  .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  .wrap {
+    width: 100%;
+    max-width: 880px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 26px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-mark {
+    width: 42px; height: 42px;
+    border-radius: 13px;
+    background: linear-gradient(145deg, var(--amber-glow), var(--amber-deep));
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,.5);
+    display: grid; place-items: center;
+    position: relative;
+  }
+  .brand-mark svg { width: 22px; height: 22px; }
+  .brand-name {
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: -0.01em;
+  }
+  .brand-sub {
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .pill-tab {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all .18s ease;
+  }
+  .pill-tab:hover { background: var(--cream-2); color: var(--ink); }
+  .pill-tab.active {
+    background: var(--paper);
+    border-color: var(--line);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---------- hero level card ---------- */
+  .hero {
+    position: relative;
+    border-radius: var(--radius-lg);
+    padding: 30px 32px 28px;
+    color: #fff5e2;
+    overflow: hidden;
+    background:
+      radial-gradient(140% 120% at 12% 0%, #ff9d3c 0%, rgba(255,157,60,0) 55%),
+      radial-gradient(120% 130% at 100% 100%, #c64a14 0%, rgba(198,74,20,0) 60%),
+      linear-gradient(150deg, #e8870b 0%, #c4520e 100%);
+    box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.22);
+    margin-bottom: 22px;
+  }
+  .hero::after {
+    /* subtle sparkle field */
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.5), transparent),
+      radial-gradient(2px 2px at 70% 18%, rgba(255,255,255,.35), transparent),
+      radial-gradient(1.5px 1.5px at 85% 60%, rgba(255,255,255,.4), transparent),
+      radial-gradient(1.5px 1.5px at 40% 80%, rgba(255,255,255,.3), transparent),
+      radial-gradient(2px 2px at 55% 45%, rgba(255,255,255,.25), transparent);
+    pointer-events: none;
+    opacity: .8;
+  }
+  .hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    position: relative;
+    z-index: 2;
+  }
+  .hero-id { display: flex; align-items: center; gap: 18px; }
+  .level-badge {
+    position: relative;
+    width: 96px; height: 96px;
+    flex: none;
+    display: grid; place-items: center;
+  }
+  .level-badge svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .level-badge .lvl-core {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    line-height: 1;
+  }
+  .level-badge .lvl-core .lab {
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    font-weight: 800;
+    opacity: .85;
+    text-transform: uppercase;
+  }
+  .level-badge .lvl-core .num {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-size: 40px;
+    text-shadow: 0 2px 6px rgba(120,40,0,.4);
+  }
+  .hero-title-block h1 {
+    margin: 0 0 4px;
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-size: 30px;
+    letter-spacing: -0.015em;
+  }
+  .hero-rank {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.25);
+    padding: 5px 11px;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+  }
+  .hero-rank .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold-light); box-shadow: 0 0 8px var(--gold-light); }
+
+  .hero-streak {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    flex: none;
+  }
+  .flame {
+    font-size: 46px;
+    line-height: 1;
+    display: inline-block;
+    filter: drop-shadow(0 4px 10px rgba(255,120,30,.6));
+    animation: flicker 2.4s ease-in-out infinite;
+    transform-origin: 50% 90%;
+  }
+  @keyframes flicker {
+    0%, 100% { transform: scale(1) rotate(-1deg); }
+    25% { transform: scale(1.08, .96) rotate(1.5deg); }
+    50% { transform: scale(.97, 1.05) rotate(-1.5deg); }
+    75% { transform: scale(1.05, .98) rotate(1deg); }
+  }
+  .hero-streak .sk-num {
+    font-family: "Fraunces", serif;
+    font-weight: 900;
+    font-size: 34px;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .hero-streak .sk-lab {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: .9;
+  }
+
+  /* xp bar */
+  .xp-block { position: relative; z-index: 2; margin-top: 24px; }
+  .xp-meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 9px;
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .xp-meta .to-next { opacity: .9; }
+  .xp-meta .xp-val { font-weight: 700; }
+  .xp-track {
+    height: 16px;
+    border-radius: 999px;
+    background: rgba(60,20,0,.28);
+    box-shadow: inset 0 2px 4px rgba(80,20,0,.4);
+    overflow: hidden;
+    position: relative;
+  }
+  .xp-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--gold-light), #fff0c2, var(--amber-glow));
+    box-shadow: 0 0 12px rgba(255,216,102,.7);
+    transition: width 1.5s cubic-bezier(.16,.84,.34,1);
+    position: relative;
+  }
+  .xp-fill::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 2.6s ease-in-out 1.6s infinite;
+  }
+  @keyframes shimmer { 0% { transform: translateX(-100%);} 60%,100% { transform: translateX(220%);} }
+
+  /* ---------- section title ---------- */
+  .sec-title {
+    display: flex; align-items: center; gap: 10px;
+    margin: 30px 2px 14px;
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--ink);
+  }
+  .sec-title .chip {
+    font-family: "Inter", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: var(--ink-faint);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 2px 9px;
+    border-radius: 999px;
+    margin-left: auto;
+  }
+
+  /* ---------- stat tiles ---------- */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .stat {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 16px 15px;
+    box-shadow: var(--shadow-sm);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--amber);
+    opacity: .85;
+  }
+  .stat:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--amber-glow);
+  }
+  .stat .s-top { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+  .stat .s-ico {
+    width: 26px; height: 26px; border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--cream-2);
+    color: var(--amber-deep);
+    flex: none;
+  }
+  .stat .s-ico svg { width: 15px; height: 15px; }
+  .stat .s-lab {
+    font-size: 11.5px; font-weight: 600;
+    color: var(--ink-soft);
+    letter-spacing: .01em;
+  }
+  .stat .s-val {
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-size: 27px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .stat .s-val .u { font-size: 13px; font-weight: 600; color: var(--ink-faint); font-family: "Inter"; margin-left: 2px; }
+
+  /* ---------- two col layout ---------- */
+  .cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    box-shadow: var(--shadow-sm);
+  }
+  .card-h {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .card-h h3 {
+    margin: 0;
+    font-family: "Fraunces", serif;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .card-h .sub { font-size: 11.5px; color: var(--ink-faint); font-weight: 600; }
+
+  /* goal rings */
+  .rings { display: flex; gap: 8px; justify-content: space-around; align-items: flex-start; flex-wrap: wrap; }
+  .ring {
+    text-align: center;
+    flex: 1 1 0;
+    min-width: 90px;
+  }
+  .ring-wrap { position: relative; width: 102px; height: 102px; margin: 0 auto 8px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-center {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    line-height: 1;
+  }
+  .ring-center .rc-num {
+    font-family: "Fraunces", serif; font-weight: 800; font-size: 21px;
+  }
+  .ring-center .rc-den { font-size: 10.5px; color: var(--ink-faint); font-weight: 600; margin-top: 2px; }
+  .ring-lab { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+  .ring-pct { font-size: 11px; font-weight: 700; color: var(--amber-deep); }
+
+  /* wpm rank meter */
+  .meter-row { margin-top: 4px; }
+  .meter-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .meter-head .big {
+    font-family: "Fraunces", serif; font-weight: 800; font-size: 30px; line-height: 1;
+  }
+  .meter-head .big .u { font-size: 13px; color: var(--ink-faint); font-weight: 600; font-family: "Inter"; margin-left: 3px; }
+  .meter-head .tier {
+    font-size: 12px; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg, var(--amber), var(--ember));
+    padding: 4px 11px; border-radius: 999px;
+    box-shadow: var(--shadow-sm);
+  }
+  .meter-track {
+    height: 13px; border-radius: 999px;
+    background: linear-gradient(90deg, #ffe2bd, #ffcaa0 35%, #ff9a6b 70%, #ff6b4a);
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(120,60,10,.18);
+  }
+  .meter-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 0;
+    border-radius: 999px;
+    background: rgba(58,46,31,.0);
+  }
+  .meter-knob {
+    position: absolute; top: 50%; left: 0;
+    transform: translate(-50%, -50%);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 3px solid var(--ember-deep);
+    box-shadow: 0 3px 8px rgba(180,60,20,.4);
+    transition: left 1.4s cubic-bezier(.16,.84,.34,1);
+    z-index: 3;
+  }
+  .meter-ticks {
+    display: flex; justify-content: space-between;
+    margin-top: 9px;
+    font-size: 10.5px; color: var(--ink-faint); font-weight: 600;
+  }
+  .meter-note {
+    margin-top: 13px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--cream);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    padding: 9px 12px;
+    line-height: 1.4;
+  }
+  .meter-note b { color: var(--amber-deep); }
+
+  /* ---------- weekly bars (quest log) ---------- */
+  .week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    align-items: end;
+    height: 150px;
+    padding-top: 6px;
+  }
+  .day { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+  .day .bar-area { width: 100%; display: flex; align-items: flex-end; justify-content: center; height: 100%; }
+  .day .bar {
+    width: 70%;
+    max-width: 30px;
+    border-radius: 9px 9px 5px 5px;
+    background: linear-gradient(180deg, var(--amber-glow), var(--amber-deep));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.4), var(--shadow-sm);
+    height: 0;
+    transition: height 1.1s cubic-bezier(.16,.84,.34,1);
+    position: relative;
+    cursor: pointer;
+  }
+  .day .bar:hover { filter: brightness(1.06); }
+  .day .bar.best { background: linear-gradient(180deg, var(--gold-light), var(--gold-deep)); }
+  .day .bar .cap {
+    position: absolute; top: -19px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; font-weight: 700; color: var(--ink);
+    opacity: 0; transition: opacity .3s ease .9s;
+  }
+  .day .bar.show-cap .cap { opacity: 1; }
+  .day .crown {
+    position: absolute; top: -33px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; opacity: 0; transition: opacity .3s ease 1s;
+  }
+  .day .bar.show-cap .crown { opacity: 1; }
+  .day .d-lab { margin-top: 9px; font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+
+  /* ---------- achievements ---------- */
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .badge {
+    position: relative;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 18px 12px 14px;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: transform .18s ease, box-shadow .18s ease;
+    overflow: hidden;
+  }
+  .badge.unlocked { border-color: var(--gold-light); }
+  .badge.unlocked::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(120% 90% at 50% -10%, rgba(255,216,102,.28), transparent 60%);
+    pointer-events: none;
+  }
+  .badge.unlocked:hover { transform: translateY(-4px) rotate(-1deg); box-shadow: var(--shadow-md); }
+  .badge .medal {
+    width: 52px; height: 52px; margin: 0 auto 10px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 24px;
+    position: relative;
+  }
+  .badge.unlocked .medal {
+    background: radial-gradient(circle at 35% 30%, #fff2c4, var(--gold) 70%, var(--gold-deep));
+    box-shadow: 0 4px 12px rgba(184,134,11,.45), inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .badge.locked { background: #f7f1e4; opacity: .92; }
+  .badge.locked .medal {
+    background: #e7ddc8;
+    color: #b6a888;
+    box-shadow: inset 0 2px 4px rgba(120,100,60,.15);
+  }
+  .badge.locked .b-name, .badge.locked .b-desc { color: var(--ink-faint); }
+  .badge .b-name { font-size: 12.5px; font-weight: 700; margin-bottom: 3px; }
+  .badge .b-desc { font-size: 10.5px; color: var(--ink-soft); line-height: 1.35; }
+  .badge .lock-pip {
+    position: absolute; top: 10px; right: 10px;
+    font-size: 11px; color: #b6a888;
+  }
+  .badge .new-pip {
+    position: absolute; top: 9px; right: 9px;
+    font-size: 8.5px; font-weight: 800; letter-spacing: .06em;
+    color: #fff; background: var(--ember);
+    padding: 2px 6px; border-radius: 999px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---------- top words / apps ---------- */
+  .duo { display: grid; grid-template-columns: 1fr 1.25fr; gap: 18px; }
+
+  .word-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .word-row:last-child { border-bottom: none; }
+  .word-rank {
+    width: 22px; height: 22px; border-radius: 7px; flex: none;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 800;
+    background: var(--cream-2); color: var(--amber-deep);
+  }
+  .word-row:first-child .word-rank { background: linear-gradient(135deg, var(--gold-light), var(--gold)); color: #5a4200; }
+  .word-name { font-weight: 600; font-size: 13.5px; }
+  .word-count {
+    margin-left: auto;
+    font-size: 12px; font-weight: 700;
+    color: var(--ink-soft);
+    background: var(--cream);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 9px;
+  }
+
+  .app-row { padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+  .app-row:last-child { border-bottom: none; }
+  .app-head { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .app-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .app-name { font-size: 13px; font-weight: 600; }
+  .app-name .mono { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .app-stat { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .app-track { height: 9px; border-radius: 999px; background: var(--cream-2); overflow: hidden; }
+  .app-bar { height: 100%; width: 0; border-radius: 999px; transition: width 1.2s cubic-bezier(.16,.84,.34,1); }
+
+  /* ---------- heatmap ---------- */
+  .heat-card { margin-top: 18px; }
+  .heat-scroll { overflow-x: auto; padding-bottom: 6px; }
+  .heat-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 12px);
+    grid-auto-columns: 12px;
+    gap: 3px;
+    width: max-content;
+  }
+  .hc {
+    width: 12px; height: 12px; border-radius: 3px;
+    background: #f4ecd9;
+    border: 1px solid rgba(120,90,40,.05);
+  }
+  .hc.l1 { background: #ffe0a8; }
+  .hc.l2 { background: #ffc163; }
+  .hc.l3 { background: var(--amber-deep); }
+  .hc.l4 { background: var(--ember-deep); }
+  .heat-legend {
+    display: flex; align-items: center; gap: 6px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    font-size: 11px; color: var(--ink-faint); font-weight: 600;
+  }
+  .heat-legend .hc { width: 11px; height: 11px; }
+
+  .foot {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+  .foot .lit { color: var(--ember); font-weight: 700; }
+
+  /* confetti */
+  .confetti {
+    position: fixed; top: -12px;
+    width: 9px; height: 14px;
+    opacity: 0;
+    z-index: 50;
+    pointer-events: none;
+    border-radius: 2px;
+  }
+  @keyframes drop {
+    0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- top bar -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="12" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <path d="M12 17v4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-name">Mumble</div>
+          <div class="brand-sub">Insights · Profile</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="pill-tab">Overview</div>
+        <div class="pill-tab active">Profile</div>
+        <div class="pill-tab">History</div>
+      </div>
+    </div>
+
+    <!-- HERO LEVEL CARD -->
+    <div class="hero">
+      <div class="hero-top">
+        <div class="hero-id">
+          <div class="level-badge">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="42" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="7"/>
+              <circle id="lvlRing" cx="48" cy="48" r="42" fill="none" stroke="url(#lvlGrad)" stroke-width="7"
+                      stroke-linecap="round" stroke-dasharray="263.9" stroke-dashoffset="263.9"/>
+              <defs>
+                <linearGradient id="lvlGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#ffe9b0"/>
+                  <stop offset="1" stop-color="#ffd866"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="lvl-core">
+              <div class="lab">Level</div>
+              <div class="num tnum">4</div>
+            </div>
+          </div>
+          <div class="hero-title-block">
+            <h1>Fast Talker</h1>
+            <span class="hero-rank"><span class="dot"></span> Voice rank · Top tier in reach</span>
+          </div>
+        </div>
+
+        <div class="hero-streak">
+          <span class="flame">🔥</span>
+          <div class="sk-num tnum">2</div>
+          <div class="sk-lab">day streak</div>
+        </div>
+      </div>
+
+      <div class="xp-block">
+        <div class="xp-meta">
+          <span class="to-next">XP to <b>Level 5 — Word Smith</b></span>
+          <span class="xp-val tnum">420 / 600 XP</span>
+        </div>
+        <div class="xp-track">
+          <div class="xp-fill" id="xpFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STAT TILES -->
+    <div class="sec-title">Session stats <span class="chip">this session</span></div>
+    <div class="stat-grid">
+
+      <div class="stat">
+        <div class="s-top">
+          <div class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+          <div class="s-lab">Words per minute</div>
+        </div>
+        <div class="s-val tnum">92<span class="u">wpm</span></div>
+      </div>
+
+      <div class="stat">
+        <div class="s-top">
+          <div class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M9 20h6M12 5v15"/></svg></div>
+          <div class="s-lab">Total words</div>
+        </div>
+        <div class="s-val tnum">21</div>
+      </div>
+
+      <div class="stat">
+        <div class="s-top">
+          <div class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg></div>
+          <div class="s-lab">Dictations</div>
+        </div>
+        <div class="s-val tnum">3</div>
+      </div>
+
+      <div class="stat">
+        <div class="s-top">
+          <div class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div class="s-lab">Avg latency</div>
+        </div>
+        <div class="s-val tnum">474<span class="u">ms</span></div>
+      </div>
+
+      <div class="stat">
+        <div class="s-top">
+          <div class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <div class="s-lab">Apps used</div>
+        </div>
+        <div class="s-val tnum">8</div>
+      </div>
+
+      <div class="stat">
+        <div class="s-top">
+          <div class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div class="s-lab">Time saved</div>
+        </div>
+        <div class="s-val tnum">0:00<span class="u">hr</span></div>
+      </div>
+
+    </div>
+
+    <!-- GOALS + WPM RANK -->
+    <div class="sec-title">Daily quests &amp; rank</div>
+    <div class="cols">
+
+      <!-- goal rings -->
+      <div class="card">
+        <div class="card-h">
+          <h3>Daily goals</h3>
+          <span class="sub">resets at midnight</span>
+        </div>
+        <div class="rings">
+
+          <div class="ring">
+            <div class="ring-wrap">
+              <svg width="102" height="102" viewBox="0 0 102 102">
+                <circle cx="51" cy="51" r="44" fill="none" stroke="#f3e8cf" stroke-width="9"/>
+                <circle class="goalRing" data-pct="0.42" cx="51" cy="51" r="44" fill="none"
+                        stroke="url(#gA)" stroke-width="9" stroke-linecap="round"
+                        stroke-dasharray="276.5" stroke-dashoffset="276.5"/>
+                <defs><linearGradient id="gA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffce6e"/><stop offset="1" stop-color="#e8870b"/></linearGradient></defs>
+              </svg>
+              <div class="ring-center">
+                <div>
+                  <div class="rc-num tnum">21</div>
+                  <div class="rc-den tnum">/ 50 words</div>
+                </div>
+              </div>
+            </div>
+            <div class="ring-lab">Words today</div>
+            <div class="ring-pct tnum">42%</div>
+          </div>
+
+          <div class="ring">
+            <div class="ring-wrap">
+              <svg width="102" height="102" viewBox="0 0 102 102">
+                <circle cx="51" cy="51" r="44" fill="none" stroke="#f3e8cf" stroke-width="9"/>
+                <circle class="goalRing" data-pct="0.60" cx="51" cy="51" r="44" fill="none"
+                        stroke="url(#gB)" stroke-width="9" stroke-linecap="round"
+                        stroke-dasharray="276.5" stroke-dashoffset="276.5"/>
+                <defs><linearGradient id="gB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7be0cf"/><stop offset="1" stop-color="#2f9e8f"/></linearGradient></defs>
+              </svg>
+              <div class="ring-center">
+                <div>
+                  <div class="rc-num tnum">3</div>
+                  <div class="rc-den tnum">/ 5 dict.</div>
+                </div>
+              </div>
+            </div>
+            <div class="ring-lab">Dictations</div>
+            <div class="ring-pct tnum" style="color:var(--teal)">60%</div>
+          </div>
+
+          <div class="ring">
+            <div class="ring-wrap">
+              <svg width="102" height="102" viewBox="0 0 102 102">
+                <circle cx="51" cy="51" r="44" fill="none" stroke="#f3e8cf" stroke-width="9"/>
+                <circle class="goalRing" data-pct="1.0" cx="51" cy="51" r="44" fill="none"
+                        stroke="url(#gC)" stroke-width="9" stroke-linecap="round"
+                        stroke-dasharray="276.5" stroke-dashoffset="276.5"/>
+                <defs><linearGradient id="gC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd866"/><stop offset="1" stop-color="#b8860b"/></linearGradient></defs>
+              </svg>
+              <div class="ring-center">
+                <div>
+                  <div class="rc-num">✓</div>
+                  <div class="rc-den tnum">92 wpm</div>
+                </div>
+              </div>
+            </div>
+            <div class="ring-lab">Beat 80 wpm</div>
+            <div class="ring-pct tnum" style="color:var(--gold-deep)">Done!</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- wpm rank meter -->
+      <div class="card">
+        <div class="card-h">
+          <h3>WPM rank</h3>
+          <span class="sub">your pace</span>
+        </div>
+        <div class="meter-row">
+          <div class="meter-head">
+            <div class="big tnum">92<span class="u">wpm</span></div>
+            <div class="tier">Fast Talker</div>
+          </div>
+          <div class="meter-track">
+            <div class="meter-knob" id="meterKnob"></div>
+          </div>
+          <div class="meter-ticks tnum">
+            <span>0</span><span>40</span><span>80</span><span>120</span><span>160</span>
+          </div>
+          <div class="meter-note">
+            You're cruising at <b>92 wpm</b> — quicker than a steady speaker. Next tier <b>Word Smith</b> unlocks at <b>120 wpm</b>.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- WEEKLY QUEST LOG -->
+    <div class="sec-title">This week's pace <span class="chip">words per day</span></div>
+    <div class="card">
+      <div class="card-h">
+        <h3>Quest log</h3>
+        <span class="sub">peak day crowned 👑</span>
+      </div>
+      <div class="week" id="week">
+        <div class="day"><div class="bar-area"><div class="bar" data-v="2"><span class="cap tnum">2</span></div></div><div class="d-lab">Mon</div></div>
+        <div class="day"><div class="bar-area"><div class="bar" data-v="5"><span class="cap tnum">5</span></div></div><div class="d-lab">Tue</div></div>
+        <div class="day"><div class="bar-area"><div class="bar" data-v="3"><span class="cap tnum">3</span></div></div><div class="d-lab">Wed</div></div>
+        <div class="day"><div class="bar-area"><div class="bar best" data-v="8"><span class="crown">👑</span><span class="cap tnum">8</span></div></div><div class="d-lab">Thu</div></div>
+        <div class="day"><div class="bar-area"><div class="bar" data-v="4"><span class="cap tnum">4</span></div></div><div class="d-lab">Fri</div></div>
+        <div class="day"><div class="bar-area"><div class="bar" data-v="1"><span class="cap tnum">1</span></div></div><div class="d-lab">Sat</div></div>
+        <div class="day"><div class="bar-area"><div class="bar" data-v="6"><span class="cap tnum">6</span></div></div><div class="d-lab">Sun</div></div>
+      </div>
+    </div>
+
+    <!-- ACHIEVEMENTS -->
+    <div class="sec-title">Achievements <span class="chip">2 / 6 unlocked</span></div>
+    <div class="badge-grid">
+
+      <div class="badge unlocked">
+        <span class="new-pip">NEW</span>
+        <div class="medal">⚡</div>
+        <div class="b-name">Quick Draw</div>
+        <div class="b-desc">Hit 90+ wpm in a session</div>
+      </div>
+
+      <div class="badge unlocked">
+        <div class="medal">🔥</div>
+        <div class="b-name">On a Roll</div>
+        <div class="b-desc">2-day dictation streak</div>
+      </div>
+
+      <div class="badge locked">
+        <span class="lock-pip">🔒</span>
+        <div class="medal">📚</div>
+        <div class="b-name">Word Smith</div>
+        <div class="b-desc">Reach 120 wpm</div>
+      </div>
+
+      <div class="badge locked">
+        <span class="lock-pip">🔒</span>
+        <div class="medal">🗓️</div>
+        <div class="b-name">Marathon</div>
+        <div class="b-desc">7-day streak</div>
+      </div>
+
+      <div class="badge locked">
+        <span class="lock-pip">🔒</span>
+        <div class="medal">🎯</div>
+        <div class="b-name">Centurion</div>
+        <div class="b-desc">Dictate 100 words in a day</div>
+      </div>
+
+      <div class="badge locked">
+        <span class="lock-pip">🔒</span>
+        <div class="medal">🌍</div>
+        <div class="b-name">Globetrotter</div>
+        <div class="b-desc">Dictate into 15 apps</div>
+      </div>
+
+    </div>
+
+    <!-- TOP WORDS + APPS -->
+    <div class="sec-title">Loot &amp; targets</div>
+    <div class="duo">
+
+      <div class="card">
+        <div class="card-h">
+          <h3>Top words</h3>
+          <span class="sub">most spoken</span>
+        </div>
+
+        <div class="word-row">
+          <span class="word-rank">1</span>
+          <span class="word-name">exact</span>
+          <span class="word-count tnum">×3</span>
+        </div>
+        <div class="word-row">
+          <span class="word-rank">2</span>
+          <span class="word-name">criminal</span>
+          <span class="word-count tnum">×1</span>
+        </div>
+        <div class="word-row">
+          <span class="word-rank">3</span>
+          <span class="word-name">smooth</span>
+          <span class="word-count tnum">×1</span>
+        </div>
+        <div class="word-row">
+          <span class="word-rank">4</span>
+          <span class="word-name">struck</span>
+          <span class="word-count tnum">×1</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <h3>Top apps</h3>
+          <span class="sub">where words landed</span>
+        </div>
+
+        <div class="app-row">
+          <div class="app-head">
+            <span class="app-dot" style="background:var(--amber-deep)"></span>
+            <span class="app-name mono">WindowsTerminal.exe</span>
+            <span class="app-stat tnum">33 · 62%</span>
+          </div>
+          <div class="app-track"><div class="app-bar" data-w="62" style="background:linear-gradient(90deg,var(--amber-glow),var(--amber-deep))"></div></div>
+        </div>
+
+        <div class="app-row">
+          <div class="app-head">
+            <span class="app-dot" style="background:var(--teal)"></span>
+            <span class="app-name mono">zen.exe</span>
+            <span class="app-stat tnum">6 · 11%</span>
+          </div>
+          <div class="app-track"><div class="app-bar" data-w="11" style="background:linear-gradient(90deg,#7be0cf,var(--teal))"></div></div>
+        </div>
+
+        <div class="app-row">
+          <div class="app-head">
+            <span class="app-dot" style="background:var(--violet)"></span>
+            <span class="app-name mono">mumble-scaffold.exe</span>
+            <span class="app-stat tnum">5 · 9%</span>
+          </div>
+          <div class="app-track"><div class="app-bar" data-w="9" style="background:linear-gradient(90deg,#b6a3ff,var(--violet))"></div></div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- HEATMAP -->
+    <div class="sec-title">Activity map <span class="chip">52 weeks</span></div>
+    <div class="card heat-card">
+      <div class="card-h">
+        <h3>Every day counts</h3>
+        <span class="sub">keep the grid lit 🔥</span>
+      </div>
+      <div class="heat-scroll">
+        <div class="heat-grid" id="heat"></div>
+      </div>
+      <div class="heat-legend">
+        Less
+        <span class="hc"></span>
+        <span class="hc l1"></span>
+        <span class="hc l2"></span>
+        <span class="hc l3"></span>
+        <span class="hc l4"></span>
+        More
+      </div>
+    </div>
+
+    <div class="foot">
+      <span class="lit">2-day streak — keep it lit!</span> · One more day to beat your record.
+    </div>
+
+  </div>
+
+<script>
+  // ---------- heatmap: 52 weeks x 7 days, mostly empty with a few recent active cells ----------
+  (function () {
+    var heat = document.getElementById("heat");
+    var weeks = 52, days = 7;
+    // recent active cells live in the last couple columns (bottom right)
+    // map keyed by "week-day" with intensity level 1..4
+    var active = {
+      "49-2": 1, "50-4": 2, "50-5": 1,
+      "51-0": 2, "51-1": 3, "51-3": 1, "51-5": 4,
+      "51-6": 2, "50-1": 1, "48-4": 1
+    };
+    for (var w = 0; w < weeks; w++) {
+      for (var d = 0; d < days; d++) {
+        var cell = document.createElement("div");
+        cell.className = "hc";
+        var lvl = active[w + "-" + d];
+        if (lvl) cell.className += " l" + lvl;
+        var title = lvl ? (lvl * 2 + " words") : "no activity";
+        cell.title = title;
+        heat.appendChild(cell);
+      }
+    }
+  })();
+
+  // ---------- animate everything on load ----------
+  window.addEventListener("load", function () {
+    requestAnimationFrame(function () {
+      setTimeout(runAnimations, 180);
+    });
+  });
+
+  function runAnimations() {
+    // xp bar fill: 420 / 600 = 70%
+    document.getElementById("xpFill").style.width = "70%";
+
+    // level ring: level 4 out of an arc, show 70% to match xp
+    var lvlRing = document.getElementById("lvlRing");
+    var lvlCirc = 263.9;
+    lvlRing.style.transition = "stroke-dashoffset 1.5s cubic-bezier(.16,.84,.34,1)";
+    lvlRing.style.strokeDashoffset = (lvlCirc * (1 - 0.70)).toFixed(1);
+
+    // goal rings
+    document.querySelectorAll(".goalRing").forEach(function (r, i) {
+      var pct = parseFloat(r.getAttribute("data-pct"));
+      var circ = 276.5;
+      r.style.transition = "stroke-dashoffset 1.4s cubic-bezier(.16,.84,.34,1) " + (i * 0.12) + "s";
+      r.style.strokeDashoffset = (circ * (1 - pct)).toFixed(1);
+    });
+
+    // wpm meter knob: 92 of 160 scale
+    var knobPct = (92 / 160) * 100;
+    document.getElementById("meterKnob").style.left = knobPct + "%";
+
+    // weekly bars
+    var max = 8;
+    document.querySelectorAll("#week .bar").forEach(function (bar, i) {
+      var v = parseFloat(bar.getAttribute("data-v"));
+      setTimeout(function () {
+        bar.style.height = ((v / max) * 100) + "%";
+      }, 120 + i * 70);
+    });
+    // reveal caps + crown after bars grow
+    document.querySelectorAll("#week .bar").forEach(function (bar) {
+      bar.classList.add("show-cap");
+    });
+
+    // app bars
+    document.querySelectorAll(".app-bar").forEach(function (b, i) {
+      var w = parseFloat(b.getAttribute("data-w"));
+      setTimeout(function () { b.style.width = w + "%"; }, 200 + i * 130);
+    });
+
+    // celebratory confetti burst
+    burstConfetti();
+  }
+
+  function burstConfetti() {
+    var colors = ["#ffd866", "#e8870b", "#ff6b2c", "#2f9e8f", "#fff0c2", "#b8860b"];
+    var n = 26;
+    for (var i = 0; i < n; i++) {
+      (function (i) {
+        var c = document.createElement("div");
+        c.className = "confetti";
+        var left = 10 + Math.random() * 80;
+        c.style.left = left + "vw";
+        c.style.background = colors[i % colors.length];
+        c.style.transform = "rotate(" + (Math.random() * 360) + "deg)";
+        if (Math.random() > 0.5) c.style.borderRadius = "50%";
+        document.body.appendChild(c);
+        var dur = 2.2 + Math.random() * 1.6;
+        var delay = Math.random() * 0.5;
+        c.style.animation = "drop " + dur + "s ease-in " + delay + "s forwards";
+        setTimeout(function () { c.remove(); }, (dur + delay) * 1000 + 200);
+      })(i);
+    }
+  }
+
+  // ---------- interactive: tab pills ----------
+  document.querySelectorAll(".pill-tab").forEach(function (t) {
+    t.addEventListener("click", function () {
+      document.querySelectorAll(".pill-tab").forEach(function (x) { x.classList.remove("active"); });
+      t.classList.add("active");
+    });
+  });
+
+  // ---------- replay confetti when the flame is clicked ----------
+  document.querySelector(".flame").addEventListener("click", burstConfetti);
+</script>
+</body>
+</html>
