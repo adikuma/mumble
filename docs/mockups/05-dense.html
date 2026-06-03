@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mumble — Insights / Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     mumble insights — data dense / terminal pro
+     muted warm palette, amber accents, hairline grid,
+     monospace numerics, compact rows
+     ============================================================ */
+  :root {
+    /* warm muted base */
+    --bg:        #131210;
+    --bg-2:      #18160f;
+    --panel:     #1b1813;
+    --panel-2:   #211d16;
+    --line:      #2c2820;
+    --line-2:    #38332a;
+    --line-3:    #45402f;
+
+    /* type */
+    --ink:       #ece6d8;
+    --ink-2:     #b8b09c;
+    --ink-3:     #8a826e;
+    --ink-4:     #5f5949;
+
+    /* amber accent family */
+    --amber:     #f5b54a;
+    --amber-2:   #e89c2c;
+    --amber-3:   #c97f1c;
+    --amber-dim: #8a6a2c;
+    --amber-glow: rgba(245,181,74,0.16);
+
+    /* secondary signal colors (muted) */
+    --teal:      #5fb0a2;
+    --rose:      #d97a6a;
+    --sky:       #6f9bc4;
+
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    --radius: 4px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(245,181,74,0.05), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(111,155,196,0.04), transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    padding: 28px 20px 64px;
+  }
+
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  /* numeric mono helper */
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
+  .num  { font-family: var(--mono); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "zero" 1; }
+
+  /* ---------- top chrome bar ---------- */
+  .chrome {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 2px 12px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0;
+  }
+  .brand {
+    display: flex; align-items: baseline; gap: 9px;
+  }
+  .brand .logo {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
+  .brand .logo .dot { color: var(--amber); }
+  .brand .seg {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-left: 9px;
+    border-left: 1px solid var(--line-2);
+  }
+  .chrome .spacer { flex: 1; }
+  .pill {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-2);
+    padding: 3px 8px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    background: var(--panel);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .led {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 6px rgba(95,176,162,0.8);
+    animation: blink 2.4s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.45} }
+  .clock { color: var(--ink-3); }
+
+  /* ---------- ticker strip ---------- */
+  .ticker {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border: 1px solid var(--line);
+    border-top: none;
+    background:
+      linear-gradient(180deg, var(--panel-2), var(--panel));
+  }
+  .tick {
+    position: relative;
+    padding: 11px 13px 10px;
+    border-right: 1px solid var(--line);
+    cursor: default;
+    transition: background .12s ease;
+  }
+  .tick:last-child { border-right: none; }
+  .tick:hover { background: rgba(245,181,74,0.05); }
+  .tick .label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: flex; align-items: center; gap: 5px;
+    margin-bottom: 6px;
+  }
+  .tick .label .k { color: var(--amber-dim); }
+  .tick .val {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 21px;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    display: flex; align-items: baseline; gap: 4px;
+  }
+  .tick .val .unit {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
+  }
+  .tick .spark { margin-top: 7px; height: 22px; }
+  .tick .delta {
+    position: absolute; top: 11px; right: 12px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.02em;
+  }
+  .delta.up { color: var(--teal); }
+  .delta.dn { color: var(--rose); }
+  .delta.flat { color: var(--ink-4); }
+
+  /* ---------- main grid ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .span-2 { grid-column: 1 / -1; }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--panel-2), var(--panel) 60%);
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255,255,255,0.012);
+  }
+  .panel-head .title {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+  .panel-head .idx {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--amber-dim);
+    letter-spacing: 0.1em;
+  }
+  .panel-head .meta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-4);
+    text-transform: uppercase;
+  }
+  .panel-body { padding: 0; }
+
+  /* ---------- tables ---------- */
+  table.t { width: 100%; border-collapse: collapse; }
+  table.t th {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    font-weight: 500;
+    text-align: left;
+    padding: 7px 12px 6px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  table.t th.r { text-align: right; }
+  table.t td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-2);
+    vertical-align: middle;
+  }
+  table.t tr:last-child td { border-bottom: none; }
+  table.t tbody tr { transition: background .1s ease; }
+  table.t tbody tr:hover { background: var(--amber-glow); }
+  table.t tbody tr:hover td { color: var(--ink); }
+  table.t td.r { text-align: right; }
+  table.t td .key {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  table.t tbody tr:hover td .key { color: var(--ink-2); }
+  td .v {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  td .vsub { color: var(--ink-4); font-family: var(--mono); font-size: 11px; }
+
+  /* metrics table specific */
+  .metrics td:first-child { width: 52%; }
+
+  /* word/app tables: inline bars */
+  .barcell { width: 100%; }
+  .bar {
+    position: relative;
+    height: 16px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar > i {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--amber-3), var(--amber));
+    border-right: 1px solid rgba(245,181,74,0.6);
+    box-shadow: inset 0 0 0 1px rgba(245,181,74,0.12);
+    border-radius: 2px 0 0 2px;
+    transition: filter .12s ease;
+  }
+  tr:hover .bar > i { filter: brightness(1.12); }
+  .bar.app > i { background: linear-gradient(90deg, #5a4a8a, #8a76c4); border-right-color: rgba(138,118,196,0.6); }
+  .rank {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-4);
+    width: 14px;
+    display: inline-block;
+  }
+  .wname { font-family: var(--mono); color: var(--ink); font-size: 12px; }
+  .aname { font-family: var(--mono); color: var(--ink); font-size: 11.5px; }
+  .aname .ext { color: var(--ink-4); }
+  .pct { color: var(--amber); font-family: var(--mono); font-weight: 600; }
+
+  /* ---------- week line chart ---------- */
+  .chart-wrap { padding: 12px 14px 8px; }
+  .chart-svg { width: 100%; display: block; }
+  .legend {
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 14px 11px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+  }
+  .legend .it { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 3px; background: var(--amber); border-radius: 2px; }
+  .legend .stat { color: var(--ink-2); }
+  .legend .stat b { color: var(--amber); font-weight: 600; }
+
+  /* streak chip */
+  .streak {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: rgba(245,181,74,0.03);
+  }
+  .streak .flame {
+    font-size: 15px;
+    filter: saturate(1.1);
+  }
+  .streak .n { font-family: var(--mono); font-weight: 700; font-size: 18px; color: var(--amber); }
+  .streak .lbl { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+  .streak .dots { margin-left: auto; display: flex; gap: 3px; }
+  .streak .dots i {
+    width: 7px; height: 7px; border-radius: 2px; background: var(--line-3);
+  }
+  .streak .dots i.on { background: var(--amber); box-shadow: 0 0 6px rgba(245,181,74,0.5); }
+
+  /* ---------- heatmap ---------- */
+  .heat-wrap { padding: 12px 14px 14px; overflow-x: auto; }
+  .heat-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 11px);
+    gap: 3px;
+    width: max-content;
+  }
+  .cell {
+    width: 11px; height: 11px;
+    border-radius: 2px;
+    background: var(--bg-2);
+    border: 1px solid rgba(255,255,255,0.025);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .cell.l0 { background: #1a1710; }
+  .cell.l1 { background: #4a3a18; border-color: rgba(245,181,74,0.12); }
+  .cell.l2 { background: #8a6420; border-color: rgba(245,181,74,0.2); }
+  .cell.l3 { background: #c08a26; border-color: rgba(245,181,74,0.3); }
+  .cell.l4 { background: var(--amber); border-color: rgba(245,181,74,0.5); box-shadow: 0 0 5px rgba(245,181,74,0.35); }
+  .cell:hover { transform: scale(1.55); box-shadow: 0 0 0 1px var(--amber), 0 2px 8px rgba(0,0,0,0.5); z-index: 2; position: relative; }
+  .heat-foot {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px 0;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em;
+    color: var(--ink-4);
+  }
+  .heat-foot .scale { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+  .heat-foot .scale i { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* ---------- generic tooltip ---------- */
+  #tip {
+    position: fixed;
+    pointer-events: none;
+    z-index: 99;
+    background: #0c0b08;
+    border: 1px solid var(--line-3);
+    border-radius: 4px;
+    padding: 6px 9px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.6);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity .1s ease, transform .1s ease;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  #tip.show { opacity: 1; transform: translateY(0); }
+  #tip .tk { color: var(--amber); }
+  #tip .td { color: var(--ink-3); }
+
+  /* footer */
+  .foot {
+    margin-top: 16px;
+    display: flex; align-items: center; gap: 14px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-4);
+    text-transform: uppercase;
+    padding: 0 2px;
+  }
+  .foot .spacer { flex: 1; }
+  .foot .hl { color: var(--ink-3); }
+
+  /* small responsive */
+  @media (max-width: 760px) {
+    .ticker { grid-template-columns: repeat(3, 1fr); }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- top chrome -->
+  <div class="chrome">
+    <div class="brand">
+      <span class="logo">mumble<span class="dot">_</span></span>
+      <span class="seg">insights // terminal</span>
+    </div>
+    <span class="spacer"></span>
+    <span class="pill"><span class="led"></span>capture live</span>
+    <span class="pill clock mono" id="clock">--:--:-- LOCAL</span>
+    <span class="pill mono">SESSION 0xA3</span>
+  </div>
+
+  <!-- ticker strip of KPIs -->
+  <div class="ticker" id="ticker">
+    <div class="tick">
+      <div class="delta up">+4.1</div>
+      <div class="label"><span class="k">▮</span> wpm</div>
+      <div class="val num">92</div>
+      <svg class="spark" data-spark="3,6,4,7,5,8,6,9,7,9" viewBox="0 0 80 22" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="tick">
+      <div class="delta up">+21</div>
+      <div class="label"><span class="k">▮</span> words</div>
+      <div class="val num">21</div>
+      <svg class="spark" data-spark="0,2,2,5,5,8,12,15,18,21" viewBox="0 0 80 22" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="tick">
+      <div class="delta up">+3</div>
+      <div class="label"><span class="k">▮</span> dictations</div>
+      <div class="val num">3</div>
+      <svg class="spark" data-spark="0,0,1,1,1,2,2,2,3,3" viewBox="0 0 80 22" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="tick">
+      <div class="delta dn">-12ms</div>
+      <div class="label"><span class="k">▮</span> latency</div>
+      <div class="val num">474<span class="unit">ms</span></div>
+      <svg class="spark" data-spark="9,8,9,7,8,6,7,5,6,5" viewBox="0 0 80 22" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="tick">
+      <div class="delta up">+8</div>
+      <div class="label"><span class="k">▮</span> apps</div>
+      <div class="val num">8</div>
+      <svg class="spark" data-spark="1,2,3,3,4,5,6,7,7,8" viewBox="0 0 80 22" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="tick">
+      <div class="delta flat">0.0</div>
+      <div class="label"><span class="k">▮</span> saved</div>
+      <div class="val num">0:00<span class="unit">hr</span></div>
+      <svg class="spark" data-spark="0,0,0,0,0,0,0,0,0,0" viewBox="0 0 80 22" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <!-- main grid -->
+  <div class="grid">
+
+    <!-- session metrics table -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="idx">01</span>
+        <span class="title">Session Metrics</span>
+        <span class="meta">all-time</span>
+      </div>
+      <div class="panel-body">
+        <table class="t metrics">
+          <thead>
+            <tr><th>Metric</th><th class="r">Value</th><th class="r">Unit</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="key">words / minute</span></td><td class="r"><span class="v">92</span></td><td class="r"><span class="vsub">wpm</span></td></tr>
+            <tr><td><span class="key">total words</span></td><td class="r"><span class="v">21</span></td><td class="r"><span class="vsub">w</span></td></tr>
+            <tr><td><span class="key">dictations</span></td><td class="r"><span class="v">3</span></td><td class="r"><span class="vsub">n</span></td></tr>
+            <tr><td><span class="key">avg latency</span></td><td class="r"><span class="v">474</span></td><td class="r"><span class="vsub">ms</span></td></tr>
+            <tr><td><span class="key">apps used</span></td><td class="r"><span class="v">8</span></td><td class="r"><span class="vsub">n</span></td></tr>
+            <tr><td><span class="key">time saved</span></td><td class="r"><span class="v">0:00</span></td><td class="r"><span class="vsub">hr</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- week trend line chart -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="idx">02</span>
+        <span class="title">Words / Day</span>
+        <span class="meta">mon–sun</span>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap">
+          <svg class="chart-svg" id="weekchart" viewBox="0 0 360 140" preserveAspectRatio="none" aria-label="words per day"></svg>
+        </div>
+        <div class="legend">
+          <span class="it"><span class="swatch"></span> words/day</span>
+          <span class="it stat">peak <b>8</b> · thu</span>
+          <span class="it stat">μ <b>4.1</b></span>
+          <span class="it stat">Σ <b>29</b></span>
+        </div>
+        <div class="streak">
+          <span class="flame">🔥</span>
+          <span class="n">2</span>
+          <span class="lbl">day streak</span>
+          <span class="dots" title="last 7 days">
+            <i></i><i></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- top words -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="idx">03</span>
+        <span class="title">Top Words</span>
+        <span class="meta">freq desc</span>
+      </div>
+      <div class="panel-body">
+        <table class="t">
+          <thead>
+            <tr><th style="width:34%">Token</th><th>Distribution</th><th class="r">n</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="rank">1</span> <span class="wname">exact</span></td>
+              <td class="barcell"><div class="bar" data-tip="exact · 3 occurrences"><i style="width:100%"></i></div></td>
+              <td class="r"><span class="v">3</span></td>
+            </tr>
+            <tr>
+              <td><span class="rank">2</span> <span class="wname">criminal</span></td>
+              <td class="barcell"><div class="bar" data-tip="criminal · 1 occurrence"><i style="width:33.3%"></i></div></td>
+              <td class="r"><span class="v">1</span></td>
+            </tr>
+            <tr>
+              <td><span class="rank">3</span> <span class="wname">smooth</span></td>
+              <td class="barcell"><div class="bar" data-tip="smooth · 1 occurrence"><i style="width:33.3%"></i></div></td>
+              <td class="r"><span class="v">1</span></td>
+            </tr>
+            <tr>
+              <td><span class="rank">4</span> <span class="wname">struck</span></td>
+              <td class="barcell"><div class="bar" data-tip="struck · 1 occurrence"><i style="width:33.3%"></i></div></td>
+              <td class="r"><span class="v">1</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- top apps -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="idx">04</span>
+        <span class="title">Top Apps</span>
+        <span class="meta">by share</span>
+      </div>
+      <div class="panel-body">
+        <table class="t">
+          <thead>
+            <tr><th style="width:40%">Process</th><th>Share</th><th class="r">n</th><th class="r">%</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="aname">WindowsTerminal<span class="ext">.exe</span></span></td>
+              <td class="barcell"><div class="bar app" data-tip="WindowsTerminal.exe · 33 · 62%"><i style="width:100%"></i></div></td>
+              <td class="r"><span class="v">33</span></td>
+              <td class="r"><span class="pct">62%</span></td>
+            </tr>
+            <tr>
+              <td><span class="aname">zen<span class="ext">.exe</span></span></td>
+              <td class="barcell"><div class="bar app" data-tip="zen.exe · 6 · 11%"><i style="width:17.7%"></i></div></td>
+              <td class="r"><span class="v">6</span></td>
+              <td class="r"><span class="pct">11%</span></td>
+            </tr>
+            <tr>
+              <td><span class="aname">mumble-scaffold<span class="ext">.exe</span></span></td>
+              <td class="barcell"><div class="bar app" data-tip="mumble-scaffold.exe · 5 · 9%"><i style="width:14.5%"></i></div></td>
+              <td class="r"><span class="v">5</span></td>
+              <td class="r"><span class="pct">9%</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- activity heatmap (full width) -->
+    <div class="panel span-2">
+      <div class="panel-head">
+        <span class="idx">05</span>
+        <span class="title">Activity Heatmap</span>
+        <span class="meta">52 wk × 7 d · dictations/day</span>
+      </div>
+      <div class="panel-body">
+        <div class="heat-wrap">
+          <div class="heat-grid" id="heat"></div>
+          <div class="heat-foot">
+            <span>365 days · last active <span style="color:var(--amber)">today</span></span>
+            <span class="scale">
+              less
+              <i class="cell l0"></i><i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i><i class="cell l4"></i>
+              more
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <div class="foot">
+    <span>mumble v0.4.1</span>
+    <span class="hl">·</span>
+    <span>local-first</span>
+    <span class="hl">·</span>
+    <span>0 packets sent</span>
+    <span class="spacer"></span>
+    <span>generated 2026-06-03</span>
+  </div>
+
+</div>
+
+<div id="tip"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- live clock ----------
+  var clockEl = document.getElementById("clock");
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+  function tickClock() {
+    var d = new Date();
+    clockEl.textContent = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + " LOCAL";
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // ---------- shared tooltip ----------
+  var tip = document.getElementById("tip");
+  function showTip(html, x, y) {
+    tip.innerHTML = html;
+    tip.classList.add("show");
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var px = x + 12, py = y - th - 8;
+    if (px + tw > window.innerWidth - 8) px = x - tw - 12;
+    if (py < 8) py = y + 16;
+    tip.style.left = px + "px";
+    tip.style.top = py + "px";
+  }
+  function hideTip() { tip.classList.remove("show"); }
+
+  // ---------- sparklines in ticker ----------
+  function drawSpark(svg) {
+    var raw = svg.getAttribute("data-spark").split(",").map(Number);
+    var W = 80, H = 22, pad = 2;
+    var max = Math.max.apply(null, raw), min = Math.min.apply(null, raw);
+    var range = (max - min) || 1;
+    var n = raw.length;
+    var pts = raw.map(function (v, i) {
+      var x = pad + (i / (n - 1)) * (W - pad * 2);
+      var y = H - pad - ((v - min) / range) * (H - pad * 2);
+      return [x, y];
+    });
+    var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+    var area = d + " L" + pts[n - 1][0].toFixed(1) + " " + H + " L" + pts[0][0].toFixed(1) + " " + H + " Z";
+    var id = "sg" + Math.random().toString(36).slice(2, 7);
+    var flat = range === 1 && max === min;
+    var stroke = flat ? "#5f5949" : "#f5b54a";
+    svg.innerHTML =
+      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="' + stroke + '" stop-opacity="0.28"/>' +
+      '<stop offset="1" stop-color="' + stroke + '" stop-opacity="0"/></linearGradient></defs>' +
+      '<path d="' + area + '" fill="url(#' + id + ')"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + pts[n - 1][0].toFixed(1) + '" cy="' + pts[n - 1][1].toFixed(1) + '" r="1.7" fill="' + stroke + '"/>';
+    // tooltip on hover
+    var label = svg.closest(".tick").querySelector(".label").textContent.trim();
+    var val = svg.closest(".tick").querySelector(".val").textContent.trim();
+    svg.addEventListener("mousemove", function (e) {
+      showTip('<span class="tk">' + label + '</span> <span class="td">→</span> ' + val + ' <span class="td">· 10-pt trend</span>', e.clientX, e.clientY);
+    });
+    svg.addEventListener("mouseleave", hideTip);
+  }
+  document.querySelectorAll(".spark").forEach(drawSpark);
+
+  // ---------- week trend line chart ----------
+  (function drawWeek() {
+    var svg = document.getElementById("weekchart");
+    var days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    var vals = [2, 5, 3, 8, 4, 1, 6];
+    var W = 360, H = 140;
+    var ml = 22, mr = 10, mt = 14, mb = 22;
+    var iw = W - ml - mr, ih = H - mt - mb;
+    var yMax = 8;
+    function X(i) { return ml + (i / (days.length - 1)) * iw; }
+    function Y(v) { return mt + (1 - v / yMax) * ih; }
+
+    var parts = [];
+
+    // horizontal gridlines + y ticks at 0,2,4,6,8
+    for (var g = 0; g <= yMax; g += 2) {
+      var gy = Y(g);
+      parts.push('<line x1="' + ml + '" y1="' + gy.toFixed(1) + '" x2="' + (W - mr) + '" y2="' + gy.toFixed(1) +
+        '" stroke="#2c2820" stroke-width="1"' + (g === 0 ? '' : ' stroke-dasharray="2 3"') + '/>');
+      parts.push('<text x="' + (ml - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="8" fill="#5f5949">' + g + '</text>');
+    }
+
+    // x axis ticks + labels
+    days.forEach(function (d, i) {
+      var x = X(i);
+      parts.push('<line x1="' + x.toFixed(1) + '" y1="' + (mt + ih) + '" x2="' + x.toFixed(1) + '" y2="' + (mt + ih + 3) + '" stroke="#38332a" stroke-width="1"/>');
+      parts.push('<text x="' + x.toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8" fill="#8a826e" letter-spacing="0.05em">' + d.toUpperCase() + '</text>');
+    });
+
+    // area + line
+    var line = vals.map(function (v, i) { return (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); }).join(" ");
+    var area = line + " L" + X(vals.length - 1).toFixed(1) + " " + (mt + ih) + " L" + X(0).toFixed(1) + " " + (mt + ih) + " Z";
+    parts.push('<defs><linearGradient id="wkg" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="#f5b54a" stop-opacity="0.22"/>' +
+      '<stop offset="1" stop-color="#f5b54a" stop-opacity="0"/></linearGradient></defs>');
+    parts.push('<path d="' + area + '" fill="url(#wkg)"/>');
+    parts.push('<path d="' + line + '" fill="none" stroke="#f5b54a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>');
+
+    // data points (interactive)
+    vals.forEach(function (v, i) {
+      var x = X(i), y = Y(v);
+      var peak = v === yMax;
+      parts.push('<circle class="wpt" data-day="' + days[i] + '" data-val="' + v + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) +
+        '" r="' + (peak ? 3 : 2.4) + '" fill="' + (peak ? "#f5b54a" : "#18160f") + '" stroke="#f5b54a" stroke-width="1.4"/>');
+      // larger invisible hit target
+      parts.push('<circle class="wpt-hit" data-day="' + days[i] + '" data-val="' + v + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="10" fill="transparent" style="cursor:crosshair"/>');
+    });
+
+    svg.innerHTML = parts.join("");
+
+    svg.querySelectorAll(".wpt-hit").forEach(function (c) {
+      c.addEventListener("mousemove", function (e) {
+        showTip('<span class="tk">' + c.getAttribute("data-day") + '</span> <span class="td">·</span> ' + c.getAttribute("data-val") + ' words', e.clientX, e.clientY);
+      });
+      c.addEventListener("mouseleave", hideTip);
+    });
+  })();
+
+  // ---------- inline bar tooltips ----------
+  document.querySelectorAll(".bar[data-tip]").forEach(function (b) {
+    b.addEventListener("mousemove", function (e) {
+      showTip('<span class="tk">' + b.getAttribute("data-tip") + '</span>', e.clientX, e.clientY);
+    });
+    b.addEventListener("mouseleave", hideTip);
+  });
+
+  // ---------- activity heatmap ----------
+  (function buildHeat() {
+    var grid = document.getElementById("heat");
+    var weeks = 52, daysPerWeek = 7;
+    var total = weeks * daysPerWeek; // 364
+    var dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    // active cells: only a few recent ones near the end (bottom-right),
+    // matching the muted week trend (mostly empty year, recent activity)
+    // index measured from the end (0 = most recent / last cell)
+    var recent = {
+      0: 4,  // today
+      1: 2,
+      2: 3,
+      3: 1,
+      6: 2,
+      8: 1,
+      13: 1
+    };
+
+    var startDate = new Date();
+    startDate.setDate(startDate.getDate() - (total - 1));
+
+    for (var i = 0; i < total; i++) {
+      var fromEnd = total - 1 - i;
+      var level = recent[fromEnd] || 0;
+      var cell = document.createElement("div");
+      cell.className = "cell l" + level;
+
+      var d = new Date(startDate.getTime());
+      d.setDate(d.getDate() + i);
+      var iso = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      var dictations = level === 4 ? 3 : level; // map level to count, peak shows 3
+      cell.setAttribute("data-iso", iso);
+      cell.setAttribute("data-n", dictations);
+
+      cell.addEventListener("mousemove", function (e) {
+        var n = this.getAttribute("data-n");
+        var noun = n === "1" ? "dictation" : "dictations";
+        showTip('<span class="tk">' + this.getAttribute("data-iso") + '</span><br><span class="td">' + n + " " + noun + '</span>', e.clientX, e.clientY);
+      });
+      cell.addEventListener("mouseleave", hideTip);
+
+      grid.appendChild(cell);
+    }
+  })();
+
+})();
+</script>
+</body>
+</html>
