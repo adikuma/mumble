@@ -1,18 +1,11 @@
 import type { Transcript } from "@/lib/tauri";
+import { MS_PER_DAY, startOfDay } from "@/lib/stats";
 
 export type GroupKey = "Today" | "Yesterday" | "Earlier";
 
 export interface TranscriptGroup {
   key: GroupKey;
   items: Transcript[];
-}
-
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-
-function startOfDay(d: Date): number {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x.getTime();
 }
 
 export function groupByRecency(

@@ -87,17 +87,16 @@ export function DictionaryView() {
             <Plus className="size-4" />
           </Button>
         }
+        below={
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            placeholder="Search entries"
+          />
+        }
       />
 
-      <div className="mt-5">
-        <SearchBar
-          value={query}
-          onChange={setQuery}
-          placeholder="Search entries"
-        />
-      </div>
-
-      <Surface className="mt-4">
+      <Surface className="mt-5">
         {adding ? (
           <ListRow className="py-3">
             <Input

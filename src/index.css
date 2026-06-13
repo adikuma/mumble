@@ -57,7 +57,6 @@
   --text-lg: 20px;
   --text-title: 26px;
   --text-stat: 24px;
-  --text-metric: 20px;
 
   /* accordion expand and collapse, driven by radix content height. */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -206,16 +205,10 @@
 /* the indicator window is a separate tauri webview at `#/indicator`.
  * tauri marks it transparent but the global body background paints over
  * the top. this class (added by `IndicatorWindow` on mount) makes the
- * html, body, and root chain truly transparent so only the pill is visible. */
+ * body and root transparent so only the pill is visible. */
 body.indicator-window,
-body.indicator-window html,
 body.indicator-window #root {
   background: transparent !important;
-}
-
-/* tabular numerals for any column of numbers (timers, sizes, durations). */
-.tabular {
-  font-variant-numeric: tabular-nums;
 }
 
 /* keyboard shortcut chip. */

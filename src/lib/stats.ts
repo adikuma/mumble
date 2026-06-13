@@ -1,14 +1,14 @@
 import type { Transcript } from "@/lib/tauri";
 
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
+export const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-function startOfDay(d: Date): number {
+export function startOfDay(d: Date): number {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x.getTime();
 }
 
-function wordCount(text: string): number {
+export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
@@ -45,20 +45,37 @@ export function currentStreakDays(
   return streak;
 }
 
-export function avgWpmThisWeek(
+/** average pace across the last `days`, in wpm. null when nothing qualifies. */
+export function avgWpm(
   transcripts: Transcript[],
+  days: number,
   now: Date = new Date(),
 ): number | null {
-  const weekAgo = now.getTime() - 7 * MS_PER_DAY;
+  const cutoff = now.getTime() - days * MS_PER_DAY;
   let words = 0;
   let sec = 0;
   for (const t of transcripts) {
-    if (new Date(t.createdAt).getTime() < weekAgo) continue;
-    if (t.durationSec > 0) {
-      words += wordCount(t.text);
-      sec += t.durationSec;
-    }
+    if (new Date(t.createdAt).getTime() < cutoff) continue;
+    if (t.durationSec <= 0) continue;
+    words += wordCount(t.text);
+    sec += t.durationSec;
   }
-  if (sec === 0) return null;
-  return Math.round((words / sec) * 60);
+  return sec > 0 ? Math.round((words / sec) * 60) : null;
+}
+
+/** the fastest single-dictation pace in the last `days`, in wpm. */
+export function fastestWpm(
+  transcripts: Transcript[],
+  days: number,
+  now: Date = new Date(),
+): number | null {
+  const cutoff = now.getTime() - days * MS_PER_DAY;
+  let best: number | null = null;
+  for (const t of transcripts) {
+    if (new Date(t.createdAt).getTime() < cutoff) continue;
+    if (t.durationSec <= 0) continue;
+    const wpm = (wordCount(t.text) / t.durationSec) * 60;
+    if (best == null || wpm > best) best = wpm;
+  }
+  return best == null ? null : Math.round(best);
 }

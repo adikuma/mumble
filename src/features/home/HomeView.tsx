@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { TranscriptAccordion } from "@/features/home/TranscriptAccordion";
 import { groupByRecency } from "@/lib/transcripts";
-import { wordsToday, avgWpmThisWeek, currentStreakDays } from "@/lib/stats";
+import { wordsToday, avgWpm, currentStreakDays } from "@/lib/stats";
 import { isTauri, listHistory } from "@/lib/tauri";
 import { formatHotkey } from "@/lib/utils";
 import { useMumbleStore } from "@/store";
@@ -35,7 +35,7 @@ export function HomeView() {
   const stats = useMemo(
     () => ({
       words: wordsToday(transcripts),
-      wpm: avgWpmThisWeek(transcripts),
+      wpm: avgWpm(transcripts, 7),
       streak: currentStreakDays(transcripts),
     }),
     [transcripts],
