@@ -41,3 +41,4 @@ opensrc/
 # rust-analyzer cache (root)
 target/
 .audit-cache/
+src-tauri/resources/*.dll

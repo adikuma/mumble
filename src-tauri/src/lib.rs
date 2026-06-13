@@ -1,5 +1,6 @@
 pub mod app_icons;
 mod audio;
+mod cleanup_infer;
 mod cleanup_model;
 mod commands;
 mod dictionary;
@@ -69,6 +70,27 @@ pub fn run() {
             let pipeline = pipeline.clone();
             let recovery_message = history_recovery_message.clone();
             move |app| {
+                // 0. point ort at a modern onnxruntime.dll for the cleanup
+                //    model, kept separate from the old runtime sherpa bundles.
+                //    must run before any ort use. prod resolves the bundled
+                //    resource; dev falls back to the manifest copy.
+                if std::env::var_os("ORT_DYLIB_PATH").is_none() {
+                    let dll = app
+                        .path()
+                        .resolve(
+                            "resources/onnxruntime.dll",
+                            tauri::path::BaseDirectory::Resource,
+                        )
+                        .ok()
+                        .filter(|p| p.exists())
+                        .unwrap_or_else(|| {
+                            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                                .join("resources/onnxruntime.dll")
+                        });
+                    std::env::set_var("ORT_DYLIB_PATH", &dll);
+                    tracing::info!(dll = %dll.display(), "ort dylib path set");
+                }
+
                 // 1. build the tray icon.
                 if let Err(e) = tray::build(app.handle()) {
                     tracing::error!(?e, "failed to build tray");

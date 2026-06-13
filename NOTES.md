@@ -4,6 +4,27 @@ Continual log of bug fixes, design decisions, and learnings. Newest entries on t
 
 ---
 
+## 2026-06-14: mockup/insights-brutalist - cleanup model inference wired (ort + tokenizer)
+
+### What
+Wired the optional cleanup model (qwen2.5-0.5b fp32 onnx) so the toggle actually polishes dictation. raw "um so like i was uh uh thinking maybe we could meet tomorrow you know" cleans to "I was thinking maybe we could meet tomorrow. You know." new module `cleanup_infer.rs`: loads the onnx session + tokenizer, builds the chatml prompt for the fixed system+user case (no jinja), greedy kv-cache decode threading present.* back to past_key_values.*, stops on eos, max_new = min(256, max(8, raw*1.6)), 8s budget.
+
+### Runtime: separate modern onnxruntime, not sherpa's
+sherpa-rs 0.6 bundles onnxruntime 1.14 (2023), far too old to run a modern model export or pair with a modern ort crate. so the cleanup model uses its own runtime: the `ort` crate with `load-dynamic` (it links no onnxruntime itself) loads a modern onnxruntime.dll (1.26, bundled as a tauri resource) via ORT_DYLIB_PATH, set once at startup in lib.rs. two runtimes coexist: sherpa keeps its 1.14, cleanup gets 1.26, no link or name clash.
+
+### Gotchas
+- ort 2.0.0-rc.12 fails to compile (an ungated vitis EP module references a missing ort-sys binding). pinned `=2.0.0-rc.10`.
+- ort's `Tensor::from_array` rejects a 0 dimension, so the empty past_key_values for the prefill step (shape [1,2,0,64]) cannot be built that way. use `Tensor::new(&Allocator::default(), shape)` for empty kv, `from_array` for non-empty. this is the standard optimum decoder-with-past prefill.
+- the onnxruntime.dll is gitignored (16mb). prod/ci builds need it provisioned at src-tauri/resources/onnxruntime.dll (copy from a pip onnxruntime install or the official ort release) before `tauri build` bundles it.
+
+### Pipeline integration
+- Pipeline holds Option<Arc<CleanupModel>>, lazy loaded on first dictation when the toggle is on (~2gb ram, ~2s load), dropped on toggle off (commands.rs).
+- when cleanup is on the chunk loop only accumulates (no streaming paste), then the full transcript is cleaned once and pasted in a single shot. any failure (model absent, load error, 8s timeout) falls back to pasting the raw transcript. default (toggle off) path is unchanged, still streams per chunk.
+
+### Verified
+- cleanup_smoke test (cargo test cleanup_smoke -- --ignored) runs the real 2gb model end to end and prints the cleaned output. 23 unit tests pass, clippy clean.
+- remaining manual check: toggle cleanup on in the app and dictate a filler-heavy sentence to confirm the live paste path (cannot synthesize a real voice dictation here).
+
 ## 2026-06-10: mockup/insights-brutalist - full codebase sweep (frontend + backend cleanup)
 
 ### What

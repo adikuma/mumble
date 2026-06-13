@@ -77,6 +77,14 @@ cpal = "0.15"
 # --- Global hotkey (key-down / key-up events for push-to-talk) ---
 rdev = "0.5"
 
+# --- Cleanup model inference (optional Qwen2.5-0.5B fp32 ONNX) ---
+# ort uses load-dynamic so it never links its own onnxruntime; it loads a
+# modern onnxruntime.dll at runtime (ORT_DYLIB_PATH), kept separate from the
+# old runtime sherpa bundles. rc.10 is pinned because rc.12 fails to compile
+# (an ungated vitis EP module references a missing ort-sys binding).
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["load-dynamic"] }
+tokenizers = { version = "0.23.1", default-features = false, features = ["onig"] }
+
 # --- Speech recognition: sherpa-onnx Rust bindings (Parakeet-TDT v3).
 # Bundled feature builds the C++ deps via cmake. Expect a long first build.
 # Only compiled on Windows; on other targets we use a stub implementation

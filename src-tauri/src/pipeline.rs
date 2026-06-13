@@ -17,6 +17,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio::CaptureWorker;
+use crate::cleanup_infer::CleanupModel;
 use crate::history::{HistoryStore, Transcript};
 use crate::paste::PasteClient;
 use crate::settings::SettingsStore;
@@ -85,6 +86,9 @@ pub struct Pipeline {
     /// life of the app so every clipboard and `SendInput` call lands on the
     /// same thread.
     pub paste_client: PasteClient,
+    /// optional cleanup model, loaded lazily on first use when the toggle is
+    /// on and dropped when it goes off. holds ~2gb while loaded.
+    cleanup: Arc<Mutex<Option<Arc<CleanupModel>>>>,
     /// wall clock time of the most recent hotkey press, used for the
     /// sub threshold tap floor. audio duration would include the pre roll
     /// and so cannot be used for this purpose.
@@ -100,12 +104,20 @@ impl Pipeline {
             history,
             settings,
             paste_client,
+            cleanup: Arc::new(Mutex::new(None)),
             recording_started_at: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn set_transcriber(&self, t: Arc<dyn Transcriber>) {
         *self.transcriber.lock() = Some(t);
+    }
+
+    /// drop the cleanup model to free ram. called when the toggle goes off.
+    pub fn unload_cleanup(&self) {
+        if self.cleanup.lock().take().is_some() {
+            tracing::info!("cleanup model unloaded");
+        }
     }
 
     pub fn ensure_capture(&self, device: Option<&str>) -> Result<()> {
@@ -231,6 +243,10 @@ impl Pipeline {
         let shared_state = self.state.clone();
         let settings = self.settings.get();
         let paste_client = self.paste_client.clone();
+        let cleanup_slot = self.cleanup.clone();
+        // when on, suppress per chunk streaming and clean the full transcript
+        // once at the end before a single paste.
+        let cleanup_on = settings.cleanup_enabled;
 
         // schedule a 30s watchdog. if the transcribe/paste path is still
         // running by then something is wedged (sherpa onnx hang, paste
@@ -322,7 +338,7 @@ impl Pipeline {
                 }
                 accumulated.push_str(&text);
 
-                if AUTO_PASTE {
+                if AUTO_PASTE && !cleanup_on {
                     // re focus the captured window before each paste.
                     // SetForegroundWindow can fail if the user has moved focus
                     // themselves, or if windows refuses to honour our attempt.
@@ -367,6 +383,45 @@ impl Pipeline {
                         tracing::error!(?e, "paste_chunk failed");
                         emit_error(&app, e.to_string());
                     }
+                }
+            }
+
+            // cleanup pass. with the toggle on the loop above only accumulated
+            // (no streaming paste), so clean the full transcript once and paste
+            // it in a single shot. any failure falls back to the raw text.
+            if cleanup_on && AUTO_PASTE && !accumulated.trim().is_empty() {
+                let raw = accumulated.clone();
+                accumulated = match ensure_cleanup_model(&cleanup_slot).and_then(|m| m.clean(&raw))
+                {
+                    Ok(cleaned) if !cleaned.trim().is_empty() => cleaned,
+                    Ok(_) => raw,
+                    Err(e) => {
+                        tracing::warn!(?e, "cleanup failed, pasting raw transcript");
+                        raw
+                    }
+                };
+
+                // single paste of the final text, mirroring the streaming
+                // path's focus check and copy only fallback.
+                let focus_result = paste_client.focus_target(captured_hwnd);
+                let fg_now = target_app::current_foreground_hwnd();
+                let mismatch = captured_hwnd != 0 && fg_now != captured_hwnd;
+                if mismatch && focus_result.is_err() {
+                    if let Err(e) = paste_client.copy_only(&accumulated) {
+                        tracing::error!(?e, "copy_only fallback failed");
+                        emit_error(&app, e.to_string());
+                    }
+                    emit_toast(
+                        &app,
+                        "focus-changed",
+                        "focus changed, copied to clipboard instead",
+                    );
+                    focus_fallback_fired = true;
+                } else if let Err(e) =
+                    paste_client.paste_chunk(accumulated.clone(), false, captured_hwnd)
+                {
+                    tracing::error!(?e, "cleanup paste failed");
+                    emit_error(&app, e.to_string());
                 }
             }
 
@@ -447,6 +502,21 @@ impl Pipeline {
 
 fn new_id() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+/// lazy load the cleanup model into the shared slot. blocks for a couple of
+/// seconds on first call and holds ~2gb while loaded. errors if the model is
+/// not downloaded, which the caller treats as a raw fallback.
+fn ensure_cleanup_model(slot: &Arc<Mutex<Option<Arc<CleanupModel>>>>) -> Result<Arc<CleanupModel>> {
+    let mut guard = slot.lock();
+    if let Some(m) = guard.as_ref() {
+        return Ok(m.clone());
+    }
+    let dir = crate::paths::cleanup_dir()?;
+    let model = Arc::new(CleanupModel::load(&dir)?);
+    *guard = Some(model.clone());
+    tracing::info!("cleanup model loaded");
+    Ok(model)
 }
 
 /// run a 30 s watchdog on a background thread. if the app state has not

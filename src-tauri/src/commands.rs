@@ -151,6 +151,12 @@ pub fn update_settings(
         }
     }
 
+    // free the cleanup model when the toggle goes off. it reloads lazily on
+    // the next dictation if the user turns it back on.
+    if prev.cleanup_enabled && !next.cleanup_enabled {
+        pipeline.unload_cleanup();
+    }
+
     // tear down the capture worker if the input device changed. the next
     // hotkey press calls ensure_capture which builds a fresh worker on the
     // new device. dropping the old worker sends shutdown to its thread.
