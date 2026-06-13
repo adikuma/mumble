@@ -39,7 +39,6 @@ export function GeneralPanel() {
   }
 
   const hotkey = formatHotkey(settings?.hotkey ?? "Right Alt");
-  const autoPaste = settings?.autoPaste ?? true;
   const launchAtLogin = settings?.launchAtLogin ?? false;
   const preRoll = String(settings?.preRollMs ?? 0);
 
@@ -58,15 +57,6 @@ export function GeneralPanel() {
         >
           {capturing ? "Listening…" : "Change"}
         </Button>
-      </SettingRow>
-      <SettingRow
-        title="Auto-paste at cursor"
-        desc="Drop the transcript wherever your caret is."
-      >
-        <Switch
-          checked={autoPaste}
-          onCheckedChange={(v) => update({ autoPaste: v })}
-        />
       </SettingRow>
       <SettingRow
         title="Launch at login"

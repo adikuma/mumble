@@ -42,3 +42,18 @@ pub fn models_dir() -> Result<PathBuf> {
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }
+
+/// parakeet asr model assets. each model gets its own subfolder under
+/// `models/` so the cleanup model never collides with parakeet's files.
+pub fn parakeet_dir() -> Result<PathBuf> {
+    let dir = models_dir()?.join("parakeet");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// optional cleanup model assets (fp32 onnx + tokenizer).
+pub fn cleanup_dir() -> Result<PathBuf> {
+    let dir = models_dir()?.join("cleanup");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}

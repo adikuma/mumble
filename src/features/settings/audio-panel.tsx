@@ -6,14 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import {
-  isTauri,
-  listInputDevices,
-  modelStatus,
-  type DeviceInfo,
-  type ModelStatus,
-} from "@/lib/tauri";
+import { isTauri, listInputDevices, type DeviceInfo } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
 import { SettingSection } from "@/components/kit/layout";
 import { SettingControl, SettingRow } from "@/features/settings/setting-row";
@@ -23,16 +16,12 @@ export function AudioPanel() {
   const settings = useMumbleStore((s) => s.settings);
   const update = useUpdateSettings();
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
-  const [model, setModel] = useState<ModelStatus | null>(null);
 
   useEffect(() => {
     if (!isTauri()) return;
     listInputDevices()
       .then(setDevices)
       .catch(() => setDevices([]));
-    modelStatus()
-      .then(setModel)
-      .catch(() => setModel(null));
   }, []);
 
   const inputDevice = settings?.inputDevice ?? "";
@@ -61,15 +50,6 @@ export function AudioPanel() {
             ))}
           </SelectContent>
         </Select>
-      </SettingRow>
-      <SettingRow
-        title="Model"
-        desc="Runs locally on your machine. Nothing is sent to the cloud."
-      >
-        <span className="text-sm font-medium">
-          {model?.name ?? "Parakeet-TDT v3"}
-        </span>
-        {model?.present ? <Badge variant="success">Loaded</Badge> : null}
       </SettingRow>
     </SettingSection>
   );

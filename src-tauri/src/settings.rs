@@ -11,9 +11,15 @@ use crate::paths;
 /// 14 inch keyboards). pre roll defaults to 0 ms (zero buffer). capture is
 /// always live so recording starts the instant the key goes down, and the
 /// indicator shows a speak now cue, so the look back buffer stays off by
-/// default. raise it in settings if you tend to talk before the cue. auto
-/// paste defaults to ON. the only way to
-/// flip it is from the in app settings, behavior toggle.
+/// default. raise it in settings if you tend to talk before the cue.
+///
+/// `cleanup_enabled` records whether the user has opted into the cleanup
+/// model. it defaults off and is only meaningful once the model is downloaded;
+/// inference wiring lands in a later iteration.
+///
+/// note: an older `auto_paste` field was removed. paste at cursor is now the
+/// fixed runtime behavior (see `pipeline::AUTO_PASTE`). old settings.json files
+/// that still carry `auto_paste` load fine, serde ignores the unknown field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -29,18 +35,14 @@ pub struct Settings {
     #[serde(default = "default_preroll_ms")]
     pub pre_roll_ms: u32,
 
-    /// when true, transcription pastes at the cursor via simulated `Ctrl+V`
-    /// and restores the prior clipboard. when false, the transcript is left
-    /// in the clipboard and the user pastes manually.
-    #[serde(default = "default_auto_paste")]
-    pub auto_paste: bool,
+    /// whether the user has opted into the optional cleanup model. defaults
+    /// off. load bearing once inference is wired.
+    #[serde(default)]
+    pub cleanup_enabled: bool,
 }
 
 fn default_preroll_ms() -> u32 {
     0
-}
-fn default_auto_paste() -> bool {
-    true
 }
 
 impl Default for Settings {
@@ -53,7 +55,7 @@ impl Default for Settings {
             theme: "system".into(),
             paused: false,
             pre_roll_ms: default_preroll_ms(),
-            auto_paste: default_auto_paste(),
+            cleanup_enabled: false,
         }
     }
 }

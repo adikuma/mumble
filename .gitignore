@@ -15,9 +15,14 @@ dist-ssr
 src-tauri/target
 test-results
 playwright-report
+screenshots/
 
 .superpowers/
 docs/superpowers/
+
+# local-only hf push helpers (token-using, never commit)
+models/cleanup/scripts/push_code_to_hub.py
+models/cleanup/scripts/push_dataset_to_hub.py
 
 # Editor directories and files
 .vscode/*

@@ -1,6 +1,7 @@
 import { GeneralPanel } from "@/features/settings/general-panel";
 import { AppearancePanel } from "@/features/settings/appearance-panel";
 import { AudioPanel } from "@/features/settings/audio-panel";
+import { ModelsPanel } from "@/features/settings/models-panel";
 import { AboutPanel } from "@/features/settings/about-panel";
 import { Page, PageHeader } from "@/components/kit/layout";
 
@@ -16,10 +17,13 @@ export function SettingsView() {
         <GeneralPanel />
       </div>
       <div className="mt-8">
-        <AppearancePanel />
+        <ModelsPanel />
       </div>
       <div className="mt-8">
         <AudioPanel />
+      </div>
+      <div className="mt-8">
+        <AppearancePanel />
       </div>
       <div className="mt-8">
         <AboutPanel />
