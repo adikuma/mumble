@@ -11,7 +11,7 @@ export interface Settings {
   theme: string;
   paused: boolean;
   preRollMs: number;
-  autoPaste: boolean;
+  cleanupEnabled: boolean;
 }
 
 export interface Transcript {
@@ -50,6 +50,15 @@ export interface ModelStatus {
   name: string;
 }
 
+export interface CleanupStatus {
+  present: boolean;
+  path: string;
+  name: string;
+  sizeBytes: number;
+  availableDiskBytes: number;
+  requiredDiskBytes: number;
+}
+
 export interface DownloadProgress {
   filename: string;
   downloaded: number;
@@ -57,9 +66,13 @@ export interface DownloadProgress {
   done: boolean;
 }
 
-export interface DailyBucket {
-  day: string;
-  count: number;
+export interface CleanupDownloadProgress {
+  filename: string;
+  downloaded: number;
+  total: number;
+  aggregateDownloaded: number;
+  aggregateTotal: number;
+  done: boolean;
 }
 
 export interface TopEntry {
@@ -72,8 +85,6 @@ export interface InsightsData {
   sessions: number;
   avgLatencyMs: number | null;
   timeSavedSec: number;
-  dailyActivity: DailyBucket[];
-  topApps: TopEntry[];
   topWords: TopEntry[];
 }
 
@@ -103,7 +114,6 @@ export const listInputDevices = (): Promise<DeviceInfo[]> =>
 export const captureHotkey = (): Promise<string> =>
   safeInvoke("capture_hotkey");
 
-export const getState = (): Promise<AppState> => safeInvoke("get_state");
 export const getMeter = (): Promise<number> => safeInvoke("get_meter");
 
 export const listHistory = (
@@ -144,6 +154,24 @@ export const deleteDictionaryEntry = (id: number): Promise<void> =>
 export const modelStatus = (): Promise<ModelStatus> =>
   safeInvoke("model_status");
 
+export const downloadParakeetModel = (): Promise<void> =>
+  safeInvoke("download_parakeet_model");
+
+export const cleanupStatus = (): Promise<CleanupStatus> =>
+  safeInvoke("cleanup_status");
+
+export const downloadCleanupModel = (): Promise<void> =>
+  safeInvoke("download_cleanup_model");
+
+export const cancelCleanupDownload = (): Promise<void> =>
+  safeInvoke("cancel_cleanup_download");
+
+export const deleteCleanupModel = (): Promise<void> =>
+  safeInvoke("delete_cleanup_model");
+
+export const revealModelsDir = (): Promise<void> =>
+  safeInvoke("reveal_models_dir");
+
 export const getInsights = (rangeDays = 7): Promise<InsightsData> =>
   safeInvoke("get_insights", { rangeDays });
 
@@ -158,6 +186,11 @@ export interface TranscribedEvent {
 }
 export interface ErrorEvent {
   message: string;
+}
+
+export interface ToastEvent {
+  kind: string;
+  text: string;
 }
 
 export interface ChunkProgressEvent {
@@ -184,6 +217,11 @@ export const onError = (
 ): Promise<UnlistenFn> =>
   listen<ErrorEvent>("mumble://error", (evt) => handler(evt.payload));
 
+export const onToast = (
+  handler: (e: ToastEvent) => void,
+): Promise<UnlistenFn> =>
+  listen<ToastEvent>("mumble://toast", (evt) => handler(evt.payload));
+
 export const onDownloadProgress = (
   handler: (e: DownloadProgress) => void,
 ): Promise<UnlistenFn> =>
@@ -207,5 +245,12 @@ export const onChunkProgress = (
   handler: (e: ChunkProgressEvent) => void,
 ): Promise<UnlistenFn> =>
   listen<ChunkProgressEvent>("mumble://chunk-progress", (evt) =>
+    handler(evt.payload),
+  );
+
+export const onCleanupDownloadProgress = (
+  handler: (e: CleanupDownloadProgress) => void,
+): Promise<UnlistenFn> =>
+  listen<CleanupDownloadProgress>("mumble://cleanup-download-progress", (evt) =>
     handler(evt.payload),
   );

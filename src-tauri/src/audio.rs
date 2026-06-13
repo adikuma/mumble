@@ -122,8 +122,12 @@ impl CaptureWorker {
             .name("mumble-capture".into())
             .spawn(move || {
                 init_com();
-                let outcome = run_worker(device_name.as_deref(), cmd_rx);
-                let _ = ready_tx.send(outcome.map(|_| ()));
+                // run_worker signals readiness itself once the stream is
+                // playing. an init error returns before that signal is sent,
+                // so forward it to the waiting caller here.
+                if let Err(e) = run_worker(device_name.as_deref(), cmd_rx, &ready_tx) {
+                    let _ = ready_tx.send(Err(e));
+                }
                 uninit_com();
             })
             .context("spawn capture worker thread")?;
@@ -204,7 +208,11 @@ fn uninit_com() {}
 
 /// runs on the worker thread. owns the `cpal::Stream` for the worker's
 /// entire lifetime so cpal sees a stable owning thread.
-fn run_worker(device_name: Option<&str>, cmd_rx: Receiver<CaptureCommand>) -> Result<()> {
+fn run_worker(
+    device_name: Option<&str>,
+    cmd_rx: Receiver<CaptureCommand>,
+    ready_tx: &Sender<Result<()>>,
+) -> Result<()> {
     let host = cpal::default_host();
     let device = pick_device(&host, device_name)?;
     let config = device.default_input_config().context("default config")?;
@@ -268,6 +276,12 @@ fn run_worker(device_name: Option<&str>, cmd_rx: Receiver<CaptureCommand>) -> Re
     };
 
     stream.play()?;
+
+    // signal the caller that the stream is live. CaptureWorker::start blocks
+    // on this handshake, so it must fire before the command loop below, not
+    // after it exits at shutdown. sending it late deadlocked the hotkey
+    // dispatcher on the first press after launch.
+    let _ = ready_tx.send(Ok(()));
 
     // process commands until shutdown or the sender side hangs up.
     while let Ok(cmd) = cmd_rx.recv() {

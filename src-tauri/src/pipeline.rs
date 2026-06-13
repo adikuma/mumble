@@ -28,13 +28,20 @@ use crate::transcribe::Transcriber;
 use windows::Win32::Foundation::HWND;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    SetWindowPos, HWND_TOPMOST, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_SHOWWINDOW,
 };
 
 /// sub threshold tap floor measured in wall clock press time. anything
 /// shorter than this is treated as a fat finger tap and discarded without
 /// transcription. hex uses a similar `RecordingDecisionEngine` floor.
 const MIN_RECORDING_SEC: f64 = 0.30;
+
+/// paste at cursor is the fixed runtime behavior. the user facing toggle was
+/// removed while the paste focus race is being diagnosed (see task: diagnose
+/// flaky paste). the branches guarded by this constant are kept intact so the
+/// toggle can return as a setting later without restructuring the pipeline.
+const AUTO_PASTE: bool = true;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,6 +147,10 @@ impl Pipeline {
             return;
         }
 
+        // new session. bump the generation so a watchdog still pending from a
+        // previous session cannot reset this one.
+        self.state.next_generation();
+
         if let Err(e) = self.ensure_capture(settings.input_device.as_deref()) {
             tracing::error!(?e, "ensure_capture failed");
             self.state.set(AppState::Idle);
@@ -224,8 +235,9 @@ impl Pipeline {
         // schedule a 30s watchdog. if the transcribe/paste path is still
         // running by then something is wedged (sherpa onnx hang, paste
         // worker stuck, etc). reset to idle, hide the indicator, and let
-        // the ui banner the user instead of leaving the app frozen.
-        spawn_watchdog(app.clone(), shared_state.clone());
+        // the ui banner the user instead of leaving the app frozen. the
+        // generation pins it to this session so a later press is never reset.
+        spawn_watchdog(app.clone(), shared_state.clone(), shared_state.generation());
 
         tauri::async_runtime::spawn_blocking(move || {
             // chunk the audio so each piece stays under the sherpa onnx
@@ -242,7 +254,7 @@ impl Pipeline {
 
             // capture the foreground app and snapshot the clipboard before any
             // paste keystrokes. once we synth Ctrl+V the focus may shift.
-            let captured = if settings.auto_paste {
+            let captured = if AUTO_PASTE {
                 target_app::current_foreground_app()
             } else {
                 None
@@ -250,7 +262,7 @@ impl Pipeline {
             let captured_app = captured.as_ref().map(|c| c.name.clone());
             let captured_app_path = captured.as_ref().map(|c| c.path.clone());
             let captured_hwnd: isize = captured.as_ref().map(|c| c.hwnd).unwrap_or(0);
-            let prior_clipboard = if settings.auto_paste {
+            let prior_clipboard = if AUTO_PASTE {
                 paste_client.snapshot_clipboard()
             } else {
                 None
@@ -310,7 +322,7 @@ impl Pipeline {
                 }
                 accumulated.push_str(&text);
 
-                if settings.auto_paste {
+                if AUTO_PASTE {
                     // re focus the captured window before each paste.
                     // SetForegroundWindow can fail if the user has moved focus
                     // themselves, or if windows refuses to honour our attempt.
@@ -363,11 +375,11 @@ impl Pipeline {
             // so the user can manually paste it wherever they want. when the
             // focus mismatch fallback fired, leave the transcript in the
             // clipboard so the user can paste it themselves.
-            if settings.auto_paste && !focus_fallback_fired {
+            if AUTO_PASTE && !focus_fallback_fired {
                 if let Err(e) = paste_client.restore_clipboard(prior_clipboard) {
                     tracing::error!(?e, "restore_clipboard failed");
                 }
-            } else if !settings.auto_paste && !accumulated.trim().is_empty() {
+            } else if !AUTO_PASTE && !accumulated.trim().is_empty() {
                 if let Err(e) = paste_client.copy_only(accumulated.trim()) {
                     tracing::error!(?e, "copy_only failed");
                     emit_error(&app, e.to_string());
@@ -440,15 +452,16 @@ fn new_id() -> String {
 /// run a 30 s watchdog on a background thread. if the app state has not
 /// returned to idle by the deadline the transcribe or paste path is wedged.
 /// the watchdog resets to idle, hides the indicator, and emits a stuck
-/// error so the ui can banner the user.
-fn spawn_watchdog(app: AppHandle, shared_state: Arc<SharedState>) {
+/// error so the ui can banner the user. it only fires for the session it was
+/// armed in (generation guard) and never for Recording, which can only belong
+/// to a newer session since the watchdog is armed once already in Transcribing.
+fn spawn_watchdog(app: AppHandle, shared_state: Arc<SharedState>, generation: u64) {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(30));
         let current = shared_state.get();
-        if matches!(
-            current,
-            AppState::Recording | AppState::Transcribing | AppState::Pasting
-        ) {
+        if shared_state.generation() == generation
+            && matches!(current, AppState::Transcribing | AppState::Pasting)
+        {
             tracing::warn!(?current, "watchdog: pipeline stuck, resetting to idle");
             shared_state.set(AppState::Idle);
             emit_state(&app, AppState::Idle);
@@ -518,7 +531,7 @@ fn show_indicator(app: &AppHandle) {
 #[cfg(windows)]
 fn show_indicator_noactivate(win: &tauri::WebviewWindow) -> Result<()> {
     let raw = win.hwnd().map_err(|e| anyhow::anyhow!("hwnd: {e}"))?;
-    let hwnd = HWND(raw.0 as *mut core::ffi::c_void);
+    let hwnd = HWND(raw.0);
     unsafe {
         SetWindowPos(
             hwnd,
@@ -534,10 +547,44 @@ fn show_indicator_noactivate(win: &tauri::WebviewWindow) -> Result<()> {
     Ok(())
 }
 
+/// hide the indicator. must mirror the raw `SetWindowPos` show path: showing
+/// the window behind tao's back leaves tao's internal visibility flag stuck
+/// on hidden, so `win.hide()` diffs hidden to hidden and silently no ops,
+/// leaving the pill on screen forever. hiding via the same raw call keeps
+/// tao's flag out of the loop entirely.
 fn hide_indicator(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("indicator") {
-        let _ = win.hide();
+        #[cfg(windows)]
+        {
+            if let Err(e) = hide_indicator_raw(&win) {
+                tracing::warn!(?e, "hide indicator via SetWindowPos failed, falling back");
+                let _ = win.hide();
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = win.hide();
+        }
     }
+}
+
+#[cfg(windows)]
+fn hide_indicator_raw(win: &tauri::WebviewWindow) -> Result<()> {
+    let raw = win.hwnd().map_err(|e| anyhow::anyhow!("hwnd: {e}"))?;
+    let hwnd = HWND(raw.0);
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+        )
+        .map_err(|e| anyhow::anyhow!("SetWindowPos: {e}"))?;
+    }
+    Ok(())
 }
 
 fn position_indicator(win: &tauri::WebviewWindow) -> Result<()> {

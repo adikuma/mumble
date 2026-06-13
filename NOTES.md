@@ -4,7 +4,67 @@ Continual log of bug fixes, design decisions, and learnings. Newest entries on t
 
 ---
 
-## 2026-05-24: main - asr benchmark (int8 vs fp32 parakeet)
+## 2026-06-10: mockup/insights-brutalist - full codebase sweep (frontend + backend cleanup)
+
+### What
+Ran a multi-agent review sweep (6 dimensions, adversarially verified) over src/ and src-tauri/src/ and applied the 40 confirmed findings. Highlights:
+
+### Backend correctness
+- pipeline.rs: the 30s watchdog could reset a newer recording session. added a generation counter to SharedState (state.rs), bumped on each idle to recording transition; the watchdog now only fires for its own session and never for Recording (which can only belong to a newer one).
+- paste.rs: PasteJob::Shutdown was a no op so PasteClientInner::drop would deadlock on join (masked only by tauri's process::exit). run_paste_worker now breaks on Shutdown like audio.rs.
+- paste.rs: restore_clipboard(None) called cb.clear(), destroying non text clipboard content (images, files). now leaves it untouched, and the Some branch uses the retry helper and propagates errors.
+- download.rs: is_active then begin was a check then act race allowing two concurrent downloads into the same files. replaced with atomic try_begin under one lock.
+- download.rs: progress emitted per network chunk (30k to 250k events for the 2 GB model). throttled to ~1 MB steps.
+- commands.rs: capture_hotkey was a sync command blocking the event loop for up to 30s. now async + spawn_blocking.
+- history.rs: update_transcript_text used .ok() which reported real db errors as "not found". switched to .optional().
+- model_download.rs: the three parakeet onnx assets shipped TODO_ placeholder sha256, so the core model downloaded unverified. pinned real digests (cross checked HF lfs pointer against the local files) and removed the TODO_ escape hatch in download.rs.
+
+### Frontend correctness
+- InsightsView: getInsights effect had no cancellation guard, so a stale range response could clobber newer data. added a stale flag, and the catch now logs instead of nulling to the empty state.
+- DailyWordsChart: a stale hover index crashed the whole window when the series shrank on range change. clamped.
+- onError and onToast (mumble://error, mumble://toast) were emitted by the backend but never listened for, so failed dictations and the focus changed clipboard fallback were silent. wired both into the bridge as toasts.
+- listener leak guards (cancelled flag) added to parakeet-row, use-cleanup-download, window-controls to match the bridge pattern.
+- app-icon: N history rows for the same app fired N concurrent ipc calls. added a module level in flight Map, plus a store identity guard so repeated icon resolves do not re render.
+
+### Cleanup and consistency
+- deleted dead modules: insights-helpers.ts, home-helpers.ts, formatRelative, getState wrapper, dailyActivity/topApps/DailyBucket (backend + ts).
+- consolidated duplicated startOfDay/MS_PER_DAY/wordCount/avgWpm/fastestWpm into lib/stats.ts (were copied across 3 modules).
+- shared focusRing constant applied to all raw buttons; shared CardHeader for insights cards; renamed useBackendBridge.ts to kebab case.
+- simplified WpmGauge stroke (was an unreachable branch), MicIndicator (dead variant/bars props), AppGrid (unused variants), button destructive-outline (token utilities).
+
+### Learnings
+- a ready/shutdown handshake must break the worker loop, not no op. paste.rs and audio.rs both had loop-forever-on-shutdown bugs from the same blind spot.
+- check then act on shared mutex state (is_active then begin) is a race even without an await between them, because tauri async commands run in parallel on the tokio pool.
+- huggingface serves the authoritative git lfs sha256 at /raw/<file> (the pointer) without downloading the file, so model digests can be pinned cheaply.
+
+## 2026-06-10: mockup/insights-brutalist - indicator pill stuck on screen (tao visibility flag desync)
+
+### Problem
+After the capture handshake fix, dictation worked but the mic pill never dismissed. Every `hide_indicator` call silently did nothing.
+
+### Root cause
+The show path bypasses tauri on windows (raw `SetWindowPos(SWP_SHOWWINDOW | SWP_NOACTIVATE)` so the pill never steals foreground), but the hide path still used `win.hide()`. tao tracks window visibility in an internal flags state and `set_visible` only applies the diff between old and new flags. since the window was shown behind tao's back, tao still believed it was hidden, so `win.hide()` diffed hidden to hidden and no oped. the pill stayed visible forever after the first show.
+
+### Fix
+`pipeline.rs`: `hide_indicator` now mirrors the show path with a raw `SetWindowPos(SWP_HIDEWINDOW | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE)` on windows, falling back to `win.hide()` only if the raw call fails.
+
+### Learnings
+- if you manipulate a tao or tauri window through raw win32 calls, every state change for that property must go raw. mixing raw show with tao hide (or vice versa) desyncs tao's cached window flags and the tao call becomes a silent no op.
+
+## 2026-06-10: mockup/insights-brutalist - capture worker ready handshake deadlocked the hotkey
+
+### Problem
+Pressing the hotkey logged `on_hotkey_press: enter` and then nothing. The mic indicator never appeared and the queued release event was never processed, so the hotkey looked dead. Earlier this surfaced as `hotkey channel full, dropping event` (the dispatcher was wedged, so the bounded channel filled); switching to an unbounded crossbeam channel removed the drops but the dispatcher still hung.
+
+### Root cause
+Commit 7c29765 rebuilt `CaptureWorker` around a ready handshake: `CaptureWorker::start` blocks on `ready_rx.recv()` until the worker confirms the wasapi stream is live. But the worker thread only sent on `ready_tx` after `run_worker` returned, and `run_worker` contains the command loop that runs until shutdown. On the happy path the ready signal was never sent, so the first `ensure_capture` after launch blocked forever inside `on_hotkey_press`, holding the capture mutex and freezing the single hotkey dispatcher thread.
+
+### Fix
+`run_worker` now takes the ready sender and signals `Ok(())` immediately after `stream.play()` succeeds, before entering the command loop. Init errors still propagate: the spawn closure forwards any early `Err` from `run_worker` to the waiting caller.
+
+### Learnings
+- a ready handshake must be signaled from inside the worker before its main loop, not from the spawn wrapper after the worker function returns. if the worker function loops forever, the wrapper send is dead code on the success path.
+- when a bounded channel reports full, treat it as a consumer stall symptom first. the fix is finding what blocked the consumer, not resizing the channel.
 
 ### What
 Benchmarked the Parakeet-TDT-0.6B-v3 model on a 150 utterance subset of LibriSpeech test-clean, comparing the int8 build we ship against fp32. Harness lives in `bench/` and uses the `sherpa-onnx` python package (same c++ core as the rust `sherpa-rs` crate, so accuracy matches the app). Full report in `BENCHMARK.md`.

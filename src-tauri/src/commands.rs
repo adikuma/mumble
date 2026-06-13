@@ -5,10 +5,14 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
+use tauri_plugin_opener::OpenerExt;
+
 use crate::audio;
+use crate::cleanup_model;
 use crate::dictionary::{Correction, DictEntry};
+use crate::download::ActiveDownload;
 use crate::history::{HistoryStore, InsightsData, Transcript};
-use crate::hotkey::HotkeyListener;
+use crate::hotkey::{CaptureError, HotkeyListener};
 use crate::model_download;
 use crate::pipeline::Pipeline;
 use crate::settings::{Settings, SettingsStore};
@@ -54,7 +58,7 @@ pub struct SettingsPatch {
     pub theme: Option<String>,
     pub paused: Option<bool>,
     pub pre_roll_ms: Option<u32>,
-    pub auto_paste: Option<bool>,
+    pub cleanup_enabled: Option<bool>,
 }
 
 // distinguish "absent" from "explicitly null" so the patch can both leave
@@ -115,13 +119,15 @@ pub fn update_settings(
             if let Some(v) = patch.pre_roll_ms {
                 s.pre_roll_ms = v;
             }
-            if let Some(v) = patch.auto_paste {
-                s.auto_paste = v;
+            if let Some(v) = patch.cleanup_enabled {
+                s.cleanup_enabled = v;
             }
         })
         .map_err(err)?;
 
-    // reconcile autostart with the os if the toggle changed.
+    // reconcile autostart with the os if the toggle changed. if the os refuses
+    // the registration, roll the persisted setting back so disk, os, and ui all
+    // agree, then surface the error to the user instead of swallowing it.
     if prev.launch_at_login != next.launch_at_login {
         let manager = app.autolaunch();
         let result = if next.launch_at_login {
@@ -130,7 +136,11 @@ pub fn update_settings(
             manager.disable()
         };
         if let Err(e) = result {
-            tracing::warn!(?e, "autostart toggle failed");
+            tracing::warn!(?e, "autostart toggle failed, rolling back");
+            // best effort revert so the persisted value matches what the os
+            // actually accepted. the ui then stays in sync via the error path.
+            let _ = store.update(|s| s.launch_at_login = prev.launch_at_login);
+            return Err(format!("couldn't update launch at login: {e}"));
         }
     }
 
@@ -179,10 +189,20 @@ pub fn list_input_devices() -> Result<Vec<DeviceInfo>, String> {
 /// side effect: temporarily swallows one key press from the listener.
 /// matches no emit.
 #[tauri::command]
-pub fn capture_hotkey(listener: State<'_, HotkeyListener>) -> Result<String, String> {
-    listener
-        .capture_next()
-        .ok_or_else(|| "timed out waiting for key press".to_string())
+pub async fn capture_hotkey(listener: State<'_, HotkeyListener>) -> Result<String, String> {
+    // capture_next blocks up to 30s on recv_timeout. run it off the event loop
+    // thread via spawn_blocking so the ui, tray, and hotkey dispatcher are not
+    // frozen while the settings page waits for a key.
+    let listener = listener.inner().clone();
+    let captured = tauri::async_runtime::spawn_blocking(move || listener.capture_next())
+        .await
+        .map_err(|e| format!("hotkey capture task failed: {e}"))?;
+    captured.map_err(|e| match e {
+        CaptureError::Timeout => "timed out waiting for a key press".to_string(),
+        CaptureError::Unsupported => {
+            "that key can't be used as a hotkey. pick a modifier (Ctrl, Alt, Shift) or a function key (F1-F12)".to_string()
+        }
+    })
 }
 
 /// read the current pipeline `AppState`. side effect free. matches the
@@ -275,28 +295,100 @@ pub fn show_main_window(app: AppHandle) {
     }
 }
 
-/// delete the cached model files and re fetch them from huggingface. side
-/// effect: writes the models directory. matches `mumble://download-progress`
-/// events emitted by `model_download` while bytes are streaming.
+/// delete the cached parakeet files and re fetch them from huggingface into
+/// `models/parakeet/`. side effect: writes the parakeet directory. matches
+/// `mumble://download-progress` events emitted while bytes are streaming.
 #[tauri::command]
-pub async fn redownload_model(app: AppHandle) -> Result<(), String> {
-    let dir = crate::paths::models_dir().map_err(err)?;
+pub async fn download_parakeet_model(app: AppHandle) -> Result<(), String> {
+    let dir = crate::paths::parakeet_dir().map_err(err)?;
     model_download::delete_model(&dir).map_err(err)?;
     model_download::ensure_model(&app, dir).await.map_err(err)?;
     Ok(())
 }
 
-/// describe whether the local model assets are present, plus their on disk
-/// path and the user facing model name. side effect free. matches no emit.
+/// describe whether the parakeet assets are present, plus their on disk path
+/// and the user facing model name. side effect free. matches no emit.
 #[tauri::command]
 pub fn model_status() -> Result<ModelStatus, String> {
-    let dir = crate::paths::models_dir().map_err(err)?;
+    let dir = crate::paths::parakeet_dir().map_err(err)?;
     let present = model_download::model_is_present(&dir);
     Ok(ModelStatus {
         present,
         path: dir.to_string_lossy().to_string(),
-        name: "Parakeet-TDT v3 (English, int8)".into(),
+        name: model_download::PARAKEET_NAME.to_string(),
     })
+}
+
+/// describe the optional cleanup model: presence, on disk path, download size,
+/// and free disk so the ui can gate the download button. side effect free.
+#[tauri::command]
+pub fn cleanup_status() -> Result<CleanupStatus, String> {
+    let dir = crate::paths::cleanup_dir().map_err(err)?;
+    Ok(CleanupStatus {
+        present: cleanup_model::model_is_present(&dir),
+        path: dir.to_string_lossy().to_string(),
+        name: cleanup_model::CLEANUP_NAME.to_string(),
+        size_bytes: cleanup_model::TOTAL_BYTES,
+        available_disk_bytes: cleanup_model::available_disk_bytes(&dir),
+        required_disk_bytes: cleanup_model::REQUIRED_DISK_BYTES,
+    })
+}
+
+/// download the cleanup model into `models/cleanup/`. refuses to start if a
+/// download is already running or if the volume lacks the required free space.
+/// side effect: writes the cleanup directory. matches
+/// `mumble://cleanup-download-progress` events while bytes are streaming.
+#[tauri::command]
+pub async fn download_cleanup_model(
+    app: AppHandle,
+    active: State<'_, ActiveDownload>,
+) -> Result<(), String> {
+    let dir = crate::paths::cleanup_dir().map_err(err)?;
+
+    let available = cleanup_model::available_disk_bytes(&dir);
+    if available < cleanup_model::REQUIRED_DISK_BYTES {
+        return Err(format!(
+            "not enough disk space: need {:.1} GB free, have {:.1} GB",
+            cleanup_model::REQUIRED_DISK_BYTES as f64 / 1e9,
+            available as f64 / 1e9,
+        ));
+    }
+
+    // clone the handle so we do not hold the tauri State across the await, and
+    // claim the slot atomically. None means a download is already in flight.
+    let active = active.inner().clone();
+    let Some(cancel) = active.try_begin() else {
+        return Err("a cleanup download is already in progress".into());
+    };
+    let result = cleanup_model::ensure_model(&app, dir, cancel).await;
+    active.clear();
+    result.map_err(err)
+}
+
+/// signal the in flight cleanup download to stop. the partial file is removed
+/// by the downloader. side effect: flips the cancellation flag. matches no emit.
+#[tauri::command]
+pub fn cancel_cleanup_download(active: State<'_, ActiveDownload>) -> Result<(), String> {
+    active.cancel();
+    Ok(())
+}
+
+/// delete the cleanup model from disk. side effect: wipes `models/cleanup/`.
+/// matches no emit (the ui refreshes via `cleanup_status`).
+#[tauri::command]
+pub fn delete_cleanup_model() -> Result<(), String> {
+    let dir = crate::paths::cleanup_dir().map_err(err)?;
+    cleanup_model::delete_model(&dir).map_err(err)
+}
+
+/// open the models directory in the os file browser. side effect: launches
+/// explorer. matches no emit.
+#[tauri::command]
+pub fn reveal_models_dir(app: AppHandle) -> Result<(), String> {
+    let dir = crate::paths::models_dir().map_err(err)?;
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 /// aggregate transcripts into insights over the last `range_days` (default
@@ -358,6 +450,17 @@ pub struct ModelStatus {
     pub present: bool,
     pub path: String,
     pub name: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupStatus {
+    pub present: bool,
+    pub path: String,
+    pub name: String,
+    pub size_bytes: u64,
+    pub available_disk_bytes: u64,
+    pub required_disk_bytes: u64,
 }
 
 /// list every dictionary entry in priority order. side effect free.

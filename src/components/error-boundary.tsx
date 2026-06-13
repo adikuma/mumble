@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<
           <button
             type="button"
             onClick={this.handleReload}
-            className="bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm font-medium"
+            className="bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             Reload
           </button>

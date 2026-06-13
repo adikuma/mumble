@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { ErrorBoundary } from "@/components/error-boundary";
 import type { Page } from "@/components/shell/routes";
-import { useBackendBridge } from "@/lib/useBackendBridge";
+import { useBackendBridge } from "@/lib/use-backend-bridge";
 
 // lazy load each main view so the initial bundle stays lean. the indicator
 // route is also split so the indicator webview never pulls the main app

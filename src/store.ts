@@ -29,5 +29,11 @@ export const useMumbleStore = create<MumbleStore>((set) => ({
 
   appIcons: {},
   setAppIcon: (exePath, icon) =>
-    set((s) => ({ appIcons: { ...s.appIcons, [exePath]: icon } })),
+    set((s) =>
+      // returning the same state object skips the store notify, so many
+      // rows resolving the same icon only re-render subscribers once.
+      s.appIcons[exePath] === icon
+        ? s
+        : { appIcons: { ...s.appIcons, [exePath]: icon } },
+    ),
 }));

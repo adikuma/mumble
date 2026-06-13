@@ -1,9 +1,12 @@
 import { useEffect } from "react";
+import { toast } from "sonner";
 import {
   getSettings,
   isTauri,
   listHistory,
+  onError,
   onSettingsChanged,
+  onToast,
   onTranscribed,
 } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
@@ -66,6 +69,18 @@ export function useBackendBridge() {
             .catch((err) => {
               console.error("getSettings refetch failed", err);
             });
+        }),
+      );
+      // surface backend pipeline errors and the focus-changed clipboard
+      // fallback so a failed dictation is never silent.
+      guard(
+        await onError((e) => {
+          toast.error(e.message || "Mumble hit an error");
+        }),
+      );
+      guard(
+        await onToast((e) => {
+          toast.info(e.text);
         }),
       );
     })();

@@ -8,11 +8,12 @@ import {
   type ChunkProgressEvent,
 } from "@/lib/tauri";
 
+// fixed waveform bar count. the design uses 14.
+const BARS = 14;
+
 interface MicIndicatorProps {
   state: AppState;
   variant: "light" | "dark";
-  /** number of waveform bars. design uses 14. */
-  bars?: number;
   /** chunk progress while streaming a long recording. null if single chunk. */
   progress?: ChunkProgressEvent | null;
 }
@@ -32,19 +33,12 @@ interface MicIndicatorProps {
 export function MicIndicator({
   state,
   variant,
-  bars = 14,
   progress = null,
 }: MicIndicatorProps) {
   if (state === "transcribing" || state === "pasting") {
     return <StatusPill state={state} variant={variant} progress={progress} />;
   }
-  return (
-    <RecordingPill
-      variant={variant}
-      bars={bars}
-      active={state === "recording"}
-    />
-  );
+  return <RecordingPill variant={variant} active={state === "recording"} />;
 }
 
 function pillClasses(className?: string) {
@@ -76,11 +70,9 @@ function dividerColor(variant: "light" | "dark") {
 
 function RecordingPill({
   variant,
-  bars,
   active,
 }: {
   variant: "light" | "dark";
-  bars: number;
   active: boolean;
 }) {
   return (
@@ -92,7 +84,7 @@ function RecordingPill({
           boxShadow: "0 0 0 4px hsl(var(--destructive) / 0.18)",
         }}
       />
-      <Waveform active={active} variant={variant} bars={bars} />
+      <Waveform active={active} />
       <span
         className="h-[15px] w-px shrink-0"
         style={{ background: dividerColor(variant) }}
@@ -150,33 +142,10 @@ function Timer({ active }: { active: boolean }) {
   );
 }
 
-function Waveform({
-  active,
-  variant,
-  bars,
-}: {
-  active: boolean;
-  variant: "light" | "dark";
-  bars: number;
-}) {
+function Waveform({ active }: { active: boolean }) {
   const [heights, setHeights] = useState<number[]>(() =>
-    Array.from({ length: bars }, () => 8),
+    Array.from({ length: BARS }, () => 8),
   );
-
-  // keep the heights array length in sync with the bars prop using the
-  // adjusting state on prop change pattern from the react docs. tracking the
-  // previous bars via state avoids both setState in effect and ref mutation
-  // in render, which the project lint forbids.
-  const [prevBars, setPrevBars] = useState<number>(bars);
-  if (prevBars !== bars) {
-    setPrevBars(bars);
-    setHeights((prev) => {
-      if (prev.length === bars) return prev;
-      if (prev.length > bars) return prev.slice(prev.length - bars);
-      const pad = Array.from({ length: bars - prev.length }, () => 8);
-      return [...pad, ...prev];
-    });
-  }
 
   useEffect(() => {
     if (!active) return;
@@ -242,7 +211,6 @@ function Waveform({
   // waveform bars use the primary token so the indicator follows the brand
   // accent in both light and dark variants.
   const barBackground = "hsl(var(--primary))";
-  void variant;
 
   return (
     <div className="flex h-4 w-[60px] shrink-0 items-center gap-[2px]">

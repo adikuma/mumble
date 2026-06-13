@@ -1,7 +1,9 @@
 pub mod app_icons;
 mod audio;
+mod cleanup_model;
 mod commands;
 mod dictionary;
+mod download;
 mod history;
 mod hotkey;
 mod model_download;
@@ -14,7 +16,6 @@ mod target_app;
 mod transcribe;
 mod tray;
 
-use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 use tauri::{Emitter, Manager};
@@ -62,6 +63,7 @@ pub fn run() {
         .manage(settings.clone())
         .manage(history.clone())
         .manage(pipeline.clone())
+        .manage(crate::download::ActiveDownload::default())
         .setup({
             let settings = settings.clone();
             let pipeline = pipeline.clone();
@@ -133,7 +135,15 @@ pub fn run() {
                 // calls into pipeline synchronously.
                 let app_handle = app.handle().clone();
                 let pipeline_for_hotkey = pipeline.clone();
-                let (hotkey_tx, hotkey_rx) = mpsc::sync_channel::<HotkeyEvent>(16);
+                // unbounded so the rdev hook never blocks AND press/release are
+                // never dropped. dropping events (the old sync_channel(16) +
+                // try_send) desynced the state machine: a dropped Release left
+                // the pipeline stuck in Recording until the 30s watchdog, so the
+                // next press read as "not Idle, ignoring" and the hotkey looked
+                // dead. crossbeam's Sender is Send+Sync, so it satisfies the
+                // rdev callback bound that std::sync::mpsc's unbounded Sender
+                // does not.
+                let (hotkey_tx, hotkey_rx) = crossbeam_channel::unbounded::<HotkeyEvent>();
                 thread::Builder::new()
                     .name("mumble-hotkey-dispatch".into())
                     .spawn(move || {
@@ -154,12 +164,12 @@ pub fn run() {
                 let listener = HotkeyListener::spawn(
                     settings.get().hotkey,
                     move |evt| {
-                        // try_send keeps the rdev hook fast even if the
-                        // dispatcher is busy. dropping an event under sustained
-                        // backpressure is preferable to blocking the global
-                        // keyboard hook.
-                        if let Err(e) = hotkey_tx.try_send(evt) {
-                            tracing::warn!(?e, "hotkey channel full, dropping event");
+                        // unbounded send never blocks the global keyboard hook
+                        // and never drops, so press/release stay paired and the
+                        // state machine never desyncs. an error here only means
+                        // the dispatcher receiver is gone (app shutting down).
+                        if let Err(e) = hotkey_tx.send(evt) {
+                            tracing::warn!(?e, "hotkey receiver gone, dropping event");
                         }
                     },
                     move || {
@@ -181,10 +191,17 @@ pub fn run() {
                 let app_handle = app.handle().clone();
                 let pipeline_for_load = pipeline.clone();
                 tauri::async_runtime::spawn(async move {
-                    let dir = match paths::models_dir() {
+                    // remove any parakeet assets a pre subfolder build left at
+                    // the root of models/, then fetch into models/parakeet/.
+                    if let Ok(root) = paths::models_dir() {
+                        if let Err(e) = model_download::purge_legacy_root_assets(&root) {
+                            tracing::warn!(?e, "purge legacy root assets failed");
+                        }
+                    }
+                    let dir = match paths::parakeet_dir() {
                         Ok(d) => d,
                         Err(e) => {
-                            tracing::error!(?e, "models_dir failed");
+                            tracing::error!(?e, "parakeet_dir failed");
                             return;
                         }
                     };
@@ -259,8 +276,13 @@ pub fn run() {
             commands::repaste_transcript,
             commands::hide_main_window,
             commands::show_main_window,
-            commands::redownload_model,
+            commands::download_parakeet_model,
             commands::model_status,
+            commands::cleanup_status,
+            commands::download_cleanup_model,
+            commands::cancel_cleanup_download,
+            commands::delete_cleanup_model,
+            commands::reveal_models_dir,
             commands::get_insights,
             commands::get_app_icon,
             commands::list_dictionary,
@@ -280,7 +302,7 @@ pub fn run() {
 #[cfg(windows)]
 fn apply_indicator_window_styles(win: &tauri::WebviewWindow) -> anyhow::Result<()> {
     let raw = win.hwnd().map_err(|e| anyhow::anyhow!("hwnd: {e}"))?;
-    let hwnd = HWND(raw.0 as *mut core::ffi::c_void);
+    let hwnd = HWND(raw.0);
     unsafe {
         let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         let updated = current | (WS_EX_NOACTIVATE.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);

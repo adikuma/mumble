@@ -259,6 +259,12 @@ fn uninit_com_sta() {}
 
 fn run_paste_worker(rx: Receiver<PasteJob>) {
     while let Ok(job) = rx.recv() {
+        // break the loop on shutdown so PasteClientInner::drop can join. the
+        // sender is still alive at drop time, so recv would otherwise block
+        // forever (mirrors CaptureCommand::Shutdown => break in audio.rs).
+        if matches!(job, PasteJob::Shutdown) {
+            break;
+        }
         // every handler is wrapped in catch_unwind so a panic from a single
         // clipboard or sendinput call never tears down the worker thread.
         let result = catch_unwind(AssertUnwindSafe(|| dispatch_job(job)));
@@ -300,8 +306,8 @@ fn dispatch_job(job: PasteJob) {
             let _ = reply.send(result);
         }
         PasteJob::Shutdown => {
-            // recv loop exits naturally on the next iteration. nothing to
-            // do here. we still match the variant for completeness.
+            // handled in run_paste_worker, which breaks before dispatching.
+            // kept for an exhaustive match.
         }
     }
 }
@@ -434,13 +440,17 @@ fn paste_chunk_blocking(text: &str, leading_space: bool, target_hwnd: isize) -> 
 }
 
 fn restore_clipboard_blocking(prior: Option<String>) -> Result<()> {
-    let mut cb = open_clipboard_with_retry().context("open clipboard")?;
     match prior {
         Some(prev) => {
-            cb.set_text(prev).ok();
+            let mut cb = open_clipboard_with_retry().context("open clipboard")?;
+            // use the retry helper and propagate failures so the caller's
+            // error log can actually fire on transient contention.
+            set_clipboard_text_with_retry(&mut cb, prev).context("restore clipboard text")?;
         }
         None => {
-            cb.clear().ok();
+            // we only snapshot text, so None means the clipboard held non text
+            // content (image, files). leave it untouched rather than clearing
+            // and destroying what the user had.
         }
     }
     Ok(())
@@ -478,10 +488,10 @@ fn focus_target_blocking(hwnd_isize: isize) -> Result<()> {
     }
     let target = HWND(hwnd_isize as *mut core::ffi::c_void);
     unsafe {
-        // tell the foreground arbiter we are deliberately handing focus
-        // back to whatever window the user was on. without this, windows
-        // refuses `SetForegroundWindow` calls from processes that did not
-        // initiate the most recent user input.
+        // best effort: grant foreground rights to all processes. this only
+        // takes effect while we still hold the foreground ourselves, so once
+        // focus has drifted away it is a no op. the AttachThreadInput path
+        // below is what actually makes SetForegroundWindow succeed.
         let _ = AllowSetForegroundWindow(ASFW_ANY);
 
         let target_tid = GetWindowThreadProcessId(target, None);

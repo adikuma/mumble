@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { PanelLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, focusRing } from "@/lib/utils";
 
 interface PanelProps {
   children: ReactNode;
@@ -22,7 +22,10 @@ export function Panel({
           type="button"
           onClick={onToggleCollapsed}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="bg-sidebar text-muted-foreground hover:bg-background hover:text-foreground border-border dark:border-sidebar-border absolute top-1/2 left-0 z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border transition-colors"
+          className={cn(
+            "bg-sidebar text-muted-foreground hover:bg-background hover:text-foreground border-border dark:border-sidebar-border absolute top-1/2 left-0 z-20 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border transition-colors",
+            focusRing,
+          )}
         >
           <PanelLeft
             className={cn(

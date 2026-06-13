@@ -26,10 +26,28 @@ pub enum HotkeyEvent {
     Released,
 }
 
+/// the capture channel carries the pressed key's canonical name, or `Err(())`
+/// when the key is not a usable binding. aliased to keep the `Arc<Mutex<...>>`
+/// wrapper readable.
+type CaptureSender = mpsc::Sender<Result<String, ()>>;
+
+/// why a hotkey capture did not yield a binding.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CaptureError {
+    /// no key was pressed within the capture window.
+    Timeout,
+    /// a key was pressed but it is not usable as a push to talk binding
+    /// (e.g. a printable letter). the caller should prompt for a modifier or
+    /// function key instead.
+    Unsupported,
+}
+
 #[derive(Clone)]
 pub struct HotkeyListener {
     binding: Arc<RwLock<String>>,
-    capture: Arc<Mutex<Option<mpsc::Sender<String>>>>,
+    // one message on this channel resolves a capture, so the ui never hangs
+    // waiting on an unmapped key.
+    capture: Arc<Mutex<Option<CaptureSender>>>,
 }
 
 impl HotkeyListener {
@@ -39,7 +57,7 @@ impl HotkeyListener {
         D: Fn() + Send + Sync + 'static,
     {
         let binding = Arc::new(RwLock::new(initial_binding));
-        let capture: Arc<Mutex<Option<mpsc::Sender<String>>>> = Arc::new(Mutex::new(None));
+        let capture: Arc<Mutex<Option<CaptureSender>>> = Arc::new(Mutex::new(None));
         let cb_binding = Arc::clone(&binding);
         let cb_capture = Arc::clone(&capture);
         let cb = Arc::new(on_event);
@@ -93,15 +111,21 @@ impl HotkeyListener {
     }
 
     /// block up to 30 seconds for the next key press, observed by the existing
-    /// listener thread. returns the canonical key name on success.
-    pub fn capture_next(&self) -> Option<String> {
+    /// listener thread. returns the canonical key name, or a `CaptureError`
+    /// distinguishing a timeout from an unsupported key so the ui can show the
+    /// right message instead of appearing to hang.
+    pub fn capture_next(&self) -> Result<String, CaptureError> {
         let (tx, rx) = mpsc::channel();
         *self.capture.lock() = Some(tx);
-        let result = rx.recv_timeout(Duration::from_secs(30)).ok();
-        // always clear the capture sender even on success so we never get
-        // stuck capturing forever if a stray sender lingered.
+        let received = rx.recv_timeout(Duration::from_secs(30));
+        // always clear the capture sender so a stray sender never leaves the
+        // listener stuck in capture mode.
         *self.capture.lock() = None;
-        result
+        match received {
+            Ok(Ok(name)) => Ok(name),
+            Ok(Err(())) => Err(CaptureError::Unsupported),
+            Err(_) => Err(CaptureError::Timeout),
+        }
     }
 }
 
@@ -110,7 +134,7 @@ impl HotkeyListener {
 fn handle_hotkey_event<F>(
     event: &Event,
     binding: &Arc<RwLock<String>>,
-    capture: &Arc<Mutex<Option<mpsc::Sender<String>>>>,
+    capture: &Arc<Mutex<Option<CaptureSender>>>,
     is_down: &Arc<Mutex<bool>>,
     cb: &Arc<F>,
 ) where
@@ -122,13 +146,18 @@ fn handle_hotkey_event<F>(
     if let EventType::KeyPress(k) = event.event_type {
         let mut guard = capture.lock();
         if let Some(sender) = guard.take() {
-            if let Some(name) = name_from_key(k) {
-                tracing::info!(name, "capture_next received key");
-                let _ = sender.send(name.to_string());
-            } else {
-                // unknown key. put the sender back so the next
-                // press can try again instead of timing out.
-                *guard = Some(sender);
+            // resolve the capture on the first press either way. a mapped key
+            // sends its name; an unmapped one sends Err so the ui can prompt
+            // for a usable key instead of waiting out the 30 s timeout.
+            match name_from_key(k) {
+                Some(name) => {
+                    tracing::info!(name, "capture_next received key");
+                    let _ = sender.send(Ok(name.to_string()));
+                }
+                None => {
+                    tracing::info!(?k, "capture_next received unsupported key");
+                    let _ = sender.send(Err(()));
+                }
             }
             return;
         }

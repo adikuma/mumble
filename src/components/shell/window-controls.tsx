@@ -1,7 +1,7 @@
 import { useEffect, useState, type ButtonHTMLAttributes } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, focusRing } from "@/lib/utils";
 import { isTauri } from "@/lib/tauri";
 
 /**
@@ -21,6 +21,7 @@ export function WindowControls() {
       .catch((err) => {
         console.warn("window-controls: isMaximized failed", err);
       });
+    let cancelled = false;
     let unlisten: (() => void) | undefined;
     win
       .onResized(() => {
@@ -32,12 +33,17 @@ export function WindowControls() {
           });
       })
       .then((u) => {
-        unlisten = u;
+        // if cleanup ran while the listen promise was in flight, drop the
+        // listener immediately instead of leaking it (same guard pattern as
+        // useBackendBridge).
+        if (cancelled) u();
+        else unlisten = u;
       })
       .catch((err) => {
         console.warn("window-controls: onResized failed", err);
       });
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, []);
@@ -85,6 +91,7 @@ function CtrlButton({
       {...props}
       className={cn(
         "text-muted-foreground flex h-full w-11 items-center justify-center transition-colors",
+        focusRing,
         variant === "close"
           ? "hover:bg-destructive hover:text-white"
           : "hover:bg-accent hover:text-foreground",

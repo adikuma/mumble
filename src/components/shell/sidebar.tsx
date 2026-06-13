@@ -2,9 +2,7 @@ import type { ComponentType } from "react";
 import { Home, BarChart3, BookText, Settings } from "lucide-react";
 import { Logo } from "@/components/logo";
 import type { Page } from "@/components/shell/routes";
-import { cn } from "@/lib/utils";
-
-export type { Page };
+import { cn, focusRing } from "@/lib/utils";
 
 type IconType = ComponentType<{ className?: string; strokeWidth?: number }>;
 
@@ -108,6 +106,7 @@ function NavButton({
       aria-current={active ? "page" : undefined}
       className={cn(
         "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors",
+        focusRing,
         collapsed && "justify-center",
         active
           ? "bg-background text-foreground dark:bg-sidebar-accent font-semibold"

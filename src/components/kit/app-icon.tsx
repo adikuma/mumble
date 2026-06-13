@@ -8,6 +8,9 @@ interface Props {
   size?: number;
 }
 
+// dedupe concurrent requests per exe so N rows for the same app fire one ipc call.
+const inflight = new Map<string, Promise<string | null>>();
+
 export function AppIcon({ exePath, appName, size = 14 }: Props) {
   const icon = useMumbleStore((s) =>
     exePath ? s.appIcons[exePath] : undefined,
@@ -17,11 +20,15 @@ export function AppIcon({ exePath, appName, size = 14 }: Props) {
   useEffect(() => {
     if (!exePath) return;
     if (icon !== undefined) return;
-    // on rejection (e.g. backend allowlist rejects the path) cache null so
-    // the fallback letter renders and we do not retry every paint.
-    getAppIcon(exePath)
-      .then((url) => setAppIcon(exePath, url))
-      .catch(() => setAppIcon(exePath, null));
+    let req = inflight.get(exePath);
+    if (!req) {
+      // on rejection (e.g. backend allowlist rejects the path) resolve null
+      // so the fallback letter renders and we do not retry every paint.
+      req = getAppIcon(exePath).catch(() => null);
+      inflight.set(exePath, req);
+      void req.finally(() => inflight.delete(exePath));
+    }
+    void req.then((url) => setAppIcon(exePath, url));
   }, [exePath, icon, setAppIcon]);
 
   if (icon) {

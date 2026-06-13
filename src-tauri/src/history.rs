@@ -8,7 +8,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -44,16 +44,7 @@ pub struct InsightsData {
     pub sessions: u64,
     pub avg_latency_ms: Option<u64>,
     pub time_saved_sec: f64,
-    pub daily_activity: Vec<DailyBucket>,
-    pub top_apps: Vec<TopEntry>,
     pub top_words: Vec<TopEntry>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DailyBucket {
-    pub day: String,
-    pub count: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -222,13 +213,15 @@ impl HistoryStore {
     // the caller can diff it for learning. returns None if the id is unknown.
     pub fn update_transcript_text(&self, id: &str, text: &str) -> Result<Option<String>> {
         let conn = self.conn.lock();
+        // .optional() maps no row to None but keeps real db errors as Err, so
+        // a locked or corrupt db is not misreported to the user as not found.
         let prev: Option<String> = conn
             .query_row(
                 "SELECT text FROM transcripts WHERE id = ?1",
                 params![id],
                 |r| r.get(0),
             )
-            .ok();
+            .optional()?;
         if prev.is_none() {
             return Ok(None);
         }
@@ -332,18 +325,16 @@ impl HistoryStore {
 
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT created_at, duration_sec, text, latency_ms, target_app
+            "SELECT duration_sec, text, latency_ms
              FROM transcripts
              WHERE created_at >= ?1",
         )?;
         let rows = stmt
             .query_map(params![cutoff_str], |row| {
                 Ok(InsightRow {
-                    created_at: row.get(0)?,
-                    duration_sec: row.get(1)?,
-                    text: row.get(2)?,
-                    latency_ms: row.get(3)?,
-                    target_app: row.get(4)?,
+                    duration_sec: row.get(0)?,
+                    text: row.get(1)?,
+                    latency_ms: row.get(2)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -354,17 +345,12 @@ impl HistoryStore {
         let mut total_words: u64 = 0;
         let mut total_duration: f64 = 0.0;
         let mut latencies: Vec<i64> = Vec::new();
-        let mut app_counts: HashMap<String, u64> = HashMap::new();
         let mut word_counts: HashMap<String, u64> = HashMap::new();
-        let mut day_counts: HashMap<String, u64> = HashMap::new();
 
         for row in &rows {
             total_duration += row.duration_sec;
             if let Some(ms) = row.latency_ms {
                 latencies.push(ms);
-            }
-            if let Some(app) = &row.target_app {
-                *app_counts.entry(app.clone()).or_default() += 1;
             }
 
             // word totals and per word frequency for top words.
@@ -378,11 +364,6 @@ impl HistoryStore {
                 }
                 *word_counts.entry(cleaned).or_default() += 1;
             }
-
-            // daily bucket. take the date prefix from rfc3339.
-            if let Some(date) = row.created_at.get(..10) {
-                *day_counts.entry(date.to_string()).or_default() += 1;
-            }
         }
 
         let avg_latency_ms = if latencies.is_empty() {
@@ -393,37 +374,24 @@ impl HistoryStore {
             Some(avg.max(0) as u64)
         };
 
-        let top_apps = top_n(app_counts, 4);
-        let top_words = top_n(word_counts, 4);
-
-        // build last n days window with zeros filled in.
-        let mut daily_activity = Vec::with_capacity(range_days as usize);
-        for i in (0..range_days as i64).rev() {
-            let day = (Utc::now() - chrono::Duration::days(i))
-                .format("%Y-%m-%d")
-                .to_string();
-            let count = day_counts.get(&day).copied().unwrap_or(0);
-            daily_activity.push(DailyBucket { day, count });
-        }
+        // return extra so the insights ui can show a longer top-words list
+        // (the redesign shows 6). stopwords are already excluded above.
+        let top_words = top_n(word_counts, 10);
 
         Ok(InsightsData {
             words: total_words,
             sessions,
             avg_latency_ms,
             time_saved_sec: total_duration,
-            daily_activity,
-            top_apps,
             top_words,
         })
     }
 }
 
 struct InsightRow {
-    created_at: String,
     duration_sec: f64,
     text: String,
     latency_ms: Option<i64>,
-    target_app: Option<String>,
 }
 
 fn top_n(counts: HashMap<String, u64>, n: usize) -> Vec<TopEntry> {

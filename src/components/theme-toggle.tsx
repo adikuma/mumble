@@ -1,5 +1,5 @@
 import { Moon, Sun } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, focusRing } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
 
 /**
@@ -7,29 +7,22 @@ import { useTheme } from "@/components/theme-provider";
  * settings page under appearance.
  */
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-
-  // resolve "system" to its current effective value so the right cell
+  // resolvedTheme folds "system" into its current effective value (and stays
+  // subscribed to the media query via the provider), so the right cell
   // highlights even when the user hasn't explicitly chosen.
-  const effective: "light" | "dark" =
-    theme === "system"
-      ? typeof window !== "undefined" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : theme;
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <div className="bg-muted border-border flex h-7 items-center gap-0.5 rounded-lg border p-0.5">
       <Cell
-        active={effective === "light"}
+        active={resolvedTheme === "light"}
         onClick={() => setTheme("light")}
         label="Light"
       >
         <Sun className="size-3" strokeWidth={2} />
       </Cell>
       <Cell
-        active={effective === "dark"}
+        active={resolvedTheme === "dark"}
         onClick={() => setTheme("dark")}
         label="Dark"
       >
@@ -58,6 +51,7 @@ function Cell({
       aria-pressed={active}
       className={cn(
         "inline-flex h-6 w-7 items-center justify-center rounded-md transition-colors",
+        focusRing,
         active
           ? "text-foreground dark:text-background bg-white dark:bg-white"
           : "text-muted-foreground hover:bg-background/60 hover:text-foreground dark:hover:bg-card",

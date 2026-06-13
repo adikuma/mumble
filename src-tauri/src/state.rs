@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 
 /// high level app state, shared across the backend.
 ///
@@ -37,6 +37,9 @@ impl AppState {
 /// lock free state holder. hotkey thread reads, worker writes.
 pub struct SharedState {
     inner: AtomicU8,
+    /// bumped on every new recording session so a stale watchdog armed by an
+    /// earlier session cannot reset a later one.
+    generation: AtomicU64,
     pub icon_cache: crate::app_icons::IconCache,
 }
 
@@ -44,6 +47,7 @@ impl SharedState {
     pub fn new() -> Self {
         Self {
             inner: AtomicU8::new(AppState::Idle as u8),
+            generation: AtomicU64::new(0),
             icon_cache: crate::app_icons::IconCache::new(),
         }
     }
@@ -54,6 +58,16 @@ impl SharedState {
 
     pub fn set(&self, next: AppState) {
         self.inner.store(next as u8, Ordering::Release);
+    }
+
+    /// bump and return the new session generation. called on each idle to
+    /// recording transition.
+    pub fn next_generation(&self) -> u64 {
+        self.generation.fetch_add(1, Ordering::AcqRel) + 1
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation.load(Ordering::Acquire)
     }
 
     pub fn compare_set(&self, expected: AppState, next: AppState) -> bool {
