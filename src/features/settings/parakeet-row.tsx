@@ -23,7 +23,9 @@ export function ParakeetRow() {
 
   useEffect(() => {
     if (!isTauri()) return;
-    modelStatus().then(setStatus).catch(() => setStatus(null));
+    modelStatus()
+      .then(setStatus)
+      .catch(() => setStatus(null));
 
     let cancelled = false;
     const unsubs: Array<() => void> = [];
@@ -35,13 +37,17 @@ export function ParakeetRow() {
     onDownloadProgress((p) => {
       if (p.done) {
         setProgress(null);
-        modelStatus().then(setStatus).catch(() => {});
+        modelStatus()
+          .then(setStatus)
+          .catch(() => {});
       } else {
         setProgress(p);
       }
     }).then(guard);
     onReady(() => {
-      modelStatus().then(setStatus).catch(() => {});
+      modelStatus()
+        .then(setStatus)
+        .catch(() => {});
     }).then(guard);
 
     return () => {

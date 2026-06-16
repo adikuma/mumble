@@ -83,9 +83,13 @@ interface CardHeaderProps {
 // treatment so sibling cards on a page stay consistent.
 export function CardHeader({ title, meta, className }: CardHeaderProps) {
   return (
-    <div className={cn("mb-3 flex items-center justify-between gap-3", className)}>
+    <div
+      className={cn("mb-3 flex items-center justify-between gap-3", className)}
+    >
       <span className="text-base font-semibold">{title}</span>
-      {meta ? <span className="text-muted-foreground text-xs">{meta}</span> : null}
+      {meta ? (
+        <span className="text-muted-foreground text-xs">{meta}</span>
+      ) : null}
     </div>
   );
 }

@@ -26,6 +26,7 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-text: hsl(var(--primary-text));
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
@@ -100,6 +101,9 @@
 
   --primary: 36 86% 58%;
   --primary-foreground: 30 45% 10%;
+  /* readable amber for text on light surfaces. the bright --primary fails wcag
+   * aa as text so use this darker amber for labels on bg-primary tints. */
+  --primary-text: 36 80% 30%;
 
   --secondary: 38 28% 94.5%;
   --secondary-foreground: 240 5.9% 10%;
@@ -139,6 +143,9 @@
 
   --primary: 258 76% 74%;
   --primary-foreground: 260 38% 10%;
+  /* on dark surfaces the bright purple already meets aa as text so the text
+   * token matches --primary. */
+  --primary-text: 258 76% 74%;
 
   --secondary: 240 4% 14%;
   --secondary-foreground: 0 0% 98%;

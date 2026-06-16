@@ -98,7 +98,9 @@ export function CleanupRow() {
           variant="outline"
           size="sm"
           disabled={blocked}
-          title={blocked ? `Need ${needGb} free, you have ${haveGb}` : undefined}
+          title={
+            blocked ? `Need ${needGb} free, you have ${haveGb}` : undefined
+          }
           onClick={start}
         >
           Download

@@ -88,14 +88,23 @@ function Row({
   }, []);
 
   async function handleCopy() {
-    await copyTranscript(transcript.id);
-    toast.success("Copied to clipboard");
+    try {
+      await copyTranscript(transcript.id);
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      toast.error(`Copy failed: ${(err as Error).message}`);
+    }
   }
 
   async function handleDelete() {
-    await deleteTranscript(transcript.id);
-    toast.success("Deleted");
-    onChanged?.();
+    try {
+      await deleteTranscript(transcript.id);
+      toast.success("Deleted");
+      onChanged?.();
+    } catch (err) {
+      // leave the row in place so the user can retry the delete.
+      toast.error(`Delete failed: ${(err as Error).message}`);
+    }
   }
 
   function startEdit() {

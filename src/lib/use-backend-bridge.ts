@@ -4,7 +4,10 @@ import {
   getSettings,
   isTauri,
   listHistory,
+  modelStatus,
+  onDownloadProgress,
   onError,
+  onReady,
   onSettingsChanged,
   onToast,
   onTranscribed,
@@ -35,6 +38,15 @@ export function useBackendBridge() {
         if (!cancelled) useMumbleStore.setState({ transcripts: list });
       } catch (err) {
         console.error("listHistory failed", err);
+      }
+
+      try {
+        // seed model readiness so home can show a download banner on a clean
+        // machine instead of a dictate hint that does nothing yet.
+        const status = await modelStatus();
+        if (!cancelled) useMumbleStore.getState().setModelReady(status.present);
+      } catch (err) {
+        console.error("modelStatus failed", err);
       }
 
       // listeners register after awaits. if the effect was cleaned up during
@@ -81,6 +93,26 @@ export function useBackendBridge() {
       guard(
         await onToast((e) => {
           toast.info(e.text);
+        }),
+      );
+      // track the required speech model download so the home view can surface
+      // progress instead of staying silent during the first run.
+      guard(
+        await onDownloadProgress((p) => {
+          const store = useMumbleStore.getState();
+          if (p.done) {
+            store.setDownloadProgress(null);
+            store.setModelReady(true);
+          } else {
+            store.setDownloadProgress(p);
+          }
+        }),
+      );
+      guard(
+        await onReady((payload) => {
+          const store = useMumbleStore.getState();
+          store.setModelReady(payload.ready);
+          if (payload.ready) store.setDownloadProgress(null);
         }),
       );
     })();

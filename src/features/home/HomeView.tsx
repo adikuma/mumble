@@ -25,6 +25,8 @@ export function HomeView() {
   const transcripts = useMumbleStore((s) => s.transcripts);
   const setTranscripts = useMumbleStore((s) => s.setTranscripts);
   const settings = useMumbleStore((s) => s.settings);
+  const modelReady = useMumbleStore((s) => s.modelReady);
+  const downloadProgress = useMumbleStore((s) => s.downloadProgress);
 
   // capture the greeting once on mount so render stays pure across rerenders.
   // the bridge already loads history on mount, so home only refreshes after
@@ -42,6 +44,24 @@ export function HomeView() {
   );
   const hotkey = formatHotkey(settings?.hotkey ?? "Right Alt");
 
+  // modelReady starts null until the bridge checks status, so only treat the
+  // model as missing once we know it is not present.
+  const modelMissing = modelReady === false;
+  const downloadPct =
+    downloadProgress && downloadProgress.total > 0
+      ? Math.round((downloadProgress.downloaded / downloadProgress.total) * 100)
+      : null;
+
+  const dictateHint = (
+    <>
+      Hold <span className="kbd">{hotkey}</span> to dictate.
+    </>
+  );
+  const downloadHint =
+    downloadPct == null
+      ? "Downloading speech model…"
+      : `Downloading speech model… ${downloadPct}%`;
+
   async function refresh() {
     if (!isTauri()) return;
     try {
@@ -55,11 +75,7 @@ export function HomeView() {
     <Page>
       <PageHeader
         title={hello}
-        description={
-          <>
-            Hold <span className="kbd">{hotkey}</span> to dictate.
-          </>
-        }
+        description={modelMissing ? downloadHint : dictateHint}
         actions={
           <div className="flex gap-7 pt-1">
             <Stat label="Words today" value={stats.words.toLocaleString()} />
@@ -72,7 +88,26 @@ export function HomeView() {
         }
       />
 
-      {groups.length === 0 ? (
+      {modelMissing ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-foreground text-base font-medium">
+            Setting up speech model
+          </p>
+          <p className="text-muted-foreground mt-2 text-sm tabular-nums">
+            {downloadHint}
+          </p>
+          <p className="text-muted-foreground/80 mt-1 text-xs">
+            This one time download is about 670 MB. Dictation unlocks when it
+            finishes.
+          </p>
+          <div className="bg-muted mt-5 h-1.5 w-56 overflow-hidden rounded-full">
+            <div
+              className="bg-primary h-full rounded-full transition-[width] duration-300"
+              style={{ width: `${downloadPct ?? 5}%` }}
+            />
+          </div>
+        </div>
+      ) : groups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <p className="text-foreground text-base font-medium">
             No dictations yet

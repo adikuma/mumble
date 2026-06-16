@@ -21,7 +21,7 @@ export function DictRow({ entry, onDelete }: DictRowProps) {
         aria-label="Delete entry"
         variant="ghost"
         size="icon-xs"
-        className="hover:text-destructive ml-auto opacity-0 transition-opacity group-hover:opacity-100"
+        className="hover:text-destructive ml-auto opacity-40 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
       >
         <X className="size-4" />
       </Button>

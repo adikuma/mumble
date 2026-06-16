@@ -34,7 +34,9 @@ export interface CleanupDownloadState {
 // the action that hit them instead of round tripping through state.
 export function useCleanupDownload(): CleanupDownloadState {
   const [status, setStatus] = useState<CleanupStatus | null>(null);
-  const [progress, setProgress] = useState<CleanupDownloadProgress | null>(null);
+  const [progress, setProgress] = useState<CleanupDownloadProgress | null>(
+    null,
+  );
   // outside the tauri runtime (browser dev) there is no model, so start in the
   // absent phase. this also keeps refresh free of any synchronous setState so
   // it is safe to fire from an effect.
