@@ -5,7 +5,7 @@
 //! streaming, verification, and progress logic lives in `download.rs`; this
 //! module only pins the parakeet asset set and the directory it lands in.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::Path;
 use tauri::AppHandle;
 
@@ -56,6 +56,67 @@ pub async fn ensure_model(app: &AppHandle, dir: std::path::PathBuf) -> Result<()
     // parakeet has no cancel button (it is required for the app to work) and
     // no aggregate bar, so pass 0/None for those.
     download::download_assets(app, &dir, ASSETS, "mumble://download-progress", 0, None).await
+}
+
+/// re fetch the parakeet model without bricking the working copy on failure.
+///
+/// downloads into a sibling staging directory and only swaps it over the live
+/// model once every asset has been fetched and verified. if the download dies
+/// partway the existing model is untouched, so a flaky network never leaves the
+/// app with no usable asr model.
+pub async fn refetch_model(app: &AppHandle, dir: &Path) -> Result<()> {
+    let staging = staging_dir(dir);
+    // start from a clean staging area so a half written previous attempt does
+    // not get mistaken for a complete download.
+    if staging.exists() {
+        std::fs::remove_dir_all(&staging)
+            .with_context(|| format!("clear staging {}", staging.display()))?;
+    }
+    std::fs::create_dir_all(&staging)
+        .with_context(|| format!("create staging {}", staging.display()))?;
+
+    // download and verify into staging. on any error bail without touching the
+    // live model, then best effort clean the staging area.
+    if let Err(e) =
+        download::download_assets(app, &staging, ASSETS, "mumble://download-progress", 0, None)
+            .await
+    {
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err(e);
+    }
+
+    // sanity check before destroying the working copy.
+    if !model_is_present(&staging) {
+        let _ = std::fs::remove_dir_all(&staging);
+        anyhow::bail!("staged parakeet download incomplete after verify");
+    }
+
+    // swap: drop the old model only now that the new one is verified on disk,
+    // then move each verified asset into place. delete_model is best effort so
+    // a locked old file does not block the swap.
+    let _ = delete_model(dir);
+    std::fs::create_dir_all(dir).with_context(|| format!("create {}", dir.display()))?;
+    for asset in ASSETS {
+        let from = staging.join(asset.filename);
+        let to = dir.join(asset.filename);
+        std::fs::rename(&from, &to)
+            .with_context(|| format!("swap {} into place", asset.filename))?;
+    }
+    let _ = std::fs::remove_dir_all(&staging);
+    Ok(())
+}
+
+/// sibling staging directory for an atomic style model swap. lives next to the
+/// live model dir so the rename stays on the same volume.
+fn staging_dir(dir: &Path) -> std::path::PathBuf {
+    let name = dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "parakeet".to_string());
+    match dir.parent() {
+        Some(parent) => parent.join(format!("{name}.staging")),
+        None => std::path::PathBuf::from(format!("{name}.staging")),
+    }
 }
 
 pub fn delete_model(dir: &Path) -> Result<()> {

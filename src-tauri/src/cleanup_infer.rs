@@ -1,9 +1,11 @@
 //! local inference for the optional cleanup model (qwen2.5-0.5b, fp32 onnx).
 //!
 //! polishes a raw transcript: removes fillers and false starts, fixes
-//! punctuation and casing. runs through `ort` (onnxruntime) reusing the same
-//! runtime sherpa already loads, with a greedy kv-cache decode loop. the model
-//! and tokenizer come from the downloaded `models/cleanup/` directory.
+//! punctuation and casing. runs through `ort` against a separate modern
+//! onnxruntime loaded dynamically via ORT_DYLIB_PATH (set in lib.rs), distinct
+//! from the older runtime sherpa bundles. only the on disk fp32 model is
+//! shared. decode is a greedy kv-cache loop. the model and tokenizer come from
+//! the downloaded `models/cleanup/` directory.
 
 use anyhow::{anyhow, Context, Result};
 use ort::memory::Allocator;
@@ -127,8 +129,7 @@ fn greedy_decode(
         let attention_mask: Vec<i64> = vec![1; total as usize];
         let position_ids: Vec<i64> = (seq_len..total).collect();
 
-        let mut inputs: Vec<(Cow<str>, SessionInputValue)> =
-            Vec::with_capacity(3 + NUM_LAYERS * 2);
+        let mut inputs: Vec<(Cow<str>, SessionInputValue)> = Vec::with_capacity(3 + NUM_LAYERS * 2);
         inputs.push((
             "input_ids".into(),
             Tensor::from_array((vec![1i64, cur_len], cur_ids.clone()))?.into(),
@@ -219,7 +220,9 @@ mod tests {
             "<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\n{raw}<|im_end|>\n<|im_start|>assistant\n"
         );
         assert!(prompt.starts_with("<|im_start|>system\n"));
-        assert!(prompt.ends_with("<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n"));
+        assert!(
+            prompt.ends_with("<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n")
+        );
     }
 
     #[test]

@@ -95,7 +95,11 @@ pub fn model_is_present(dir: &Path) -> bool {
     download::assets_present(dir, ASSETS)
 }
 
-pub async fn ensure_model(app: &AppHandle, dir: std::path::PathBuf, cancel: CancelFlag) -> Result<()> {
+pub async fn ensure_model(
+    app: &AppHandle,
+    dir: std::path::PathBuf,
+    cancel: CancelFlag,
+) -> Result<()> {
     if model_is_present(&dir) {
         return Ok(());
     }
@@ -139,9 +143,7 @@ fn available_disk_bytes_impl(dir: &Path) -> u64 {
 
     let wide = HSTRING::from(probe.as_os_str());
     let mut free_available: u64 = 0;
-    let ok = unsafe {
-        GetDiskFreeSpaceExW(&wide, Some(&mut free_available), None, None)
-    };
+    let ok = unsafe { GetDiskFreeSpaceExW(&wide, Some(&mut free_available), None, None) };
     match ok {
         Ok(()) => free_available,
         Err(e) => {

@@ -21,16 +21,30 @@ pub enum AppState {
 
 impl AppState {
     fn from_u8(v: u8) -> Self {
-        // the variants are numbered 0..=3 and we never store anything else
-        // via `set`. catching an out of range value in debug guards against
-        // a future change to the enum that forgets to update this match.
+        // walk every variant and compare against its own discriminant. the
+        // exhaustive match in all_variants() means adding a new variant is a
+        // compile error there, so this can never silently alias an unknown
+        // value to idle. behavior for the valid 0..=3 values is unchanged.
         debug_assert!(v <= 3, "AppState::from_u8 out of range: {v}");
-        match v {
-            1 => AppState::Recording,
-            2 => AppState::Transcribing,
-            3 => AppState::Pasting,
-            _ => AppState::Idle,
+        AppState::all_variants()
+            .into_iter()
+            .find(|state| v == *state as u8)
+            .unwrap_or(AppState::Idle)
+    }
+
+    /// the full set of variants. the exhaustive match (no wildcard arm) forces
+    /// a compile error when a variant is added or removed, which keeps from_u8
+    /// honest. the match value is unused beyond proving completeness.
+    fn all_variants() -> [AppState; 4] {
+        match AppState::Idle {
+            AppState::Idle | AppState::Recording | AppState::Transcribing | AppState::Pasting => {}
         }
+        [
+            AppState::Idle,
+            AppState::Recording,
+            AppState::Transcribing,
+            AppState::Pasting,
+        ]
     }
 }
 

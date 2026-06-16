@@ -44,6 +44,13 @@ const MIN_RECORDING_SEC: f64 = 0.30;
 /// toggle can return as a setting later without restructuring the pipeline.
 const AUTO_PASTE: bool = true;
 
+/// watchdog deadline floor in seconds, covering model load and short clips.
+const WATCHDOG_BASE: u64 = 30;
+/// extra seconds of watchdog budget per audio chunk. a long recording chunks
+/// into many pieces and each one takes real time to transcribe and paste, so
+/// the deadline grows with the work instead of firing mid paste.
+const WATCHDOG_PER_CHUNK: u64 = 5;
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StateChangedEvent {
@@ -248,12 +255,10 @@ impl Pipeline {
         // once at the end before a single paste.
         let cleanup_on = settings.cleanup_enabled;
 
-        // schedule a 30s watchdog. if the transcribe/paste path is still
-        // running by then something is wedged (sherpa onnx hang, paste
-        // worker stuck, etc). reset to idle, hide the indicator, and let
-        // the ui banner the user instead of leaving the app frozen. the
-        // generation pins it to this session so a later press is never reset.
-        spawn_watchdog(app.clone(), shared_state.clone(), shared_state.generation());
+        // pin this session's generation. a later press bumps the generation,
+        // which both the watchdog and the chunk loop below use to know they
+        // belong to a stale session and must stop pasting.
+        let session_generation = shared_state.generation();
 
         tauri::async_runtime::spawn_blocking(move || {
             // chunk the audio so each piece stays under the sherpa onnx
@@ -266,6 +271,19 @@ impl Pipeline {
                 total_samples = samples.len(),
                 total_duration_sec = format!("{:.2}", samples.len() as f32 / 16_000.0),
                 "transcribe: chunked"
+            );
+
+            // arm the watchdog now that we know the chunk count. a long
+            // recording legitimately takes longer to transcribe and paste, so
+            // scale the deadline by chunk count instead of a fixed 30s that
+            // could fire mid paste. the generation pins it to this session so a
+            // later press is never reset.
+            let watchdog_timeout = WATCHDOG_BASE + WATCHDOG_PER_CHUNK * u64::from(total.max(1));
+            spawn_watchdog(
+                app.clone(),
+                shared_state.clone(),
+                session_generation,
+                std::time::Duration::from_secs(watchdog_timeout),
             );
 
             // capture the foreground app and snapshot the clipboard before any
@@ -302,6 +320,18 @@ impl Pipeline {
             let mut focus_fallback_fired = false;
 
             for (i, chunk) in chunks.iter().enumerate() {
+                // cooperative cancel. if a newer session started (the watchdog
+                // reset us, or the user pressed again) the generation no longer
+                // matches. stop pasting further chunks and bail without
+                // touching the clipboard or state owned by the newer session.
+                if shared_state.generation() != session_generation {
+                    tracing::warn!(
+                        chunk = i as u32 + 1,
+                        "transcribe: session superseded, stopping paste loop"
+                    );
+                    return;
+                }
+
                 let idx = i as u32 + 1;
                 emit_chunk_progress(&app, idx, total);
                 tracing::debug!(
@@ -384,6 +414,15 @@ impl Pipeline {
                         emit_error(&app, e.to_string());
                     }
                 }
+            }
+
+            // cooperative cancel before the cleanup paste. cleanup runs the
+            // model for several seconds, long enough for a newer session to
+            // start, so re check the generation before staging a paste that
+            // would land in the wrong session.
+            if cleanup_on && AUTO_PASTE && shared_state.generation() != session_generation {
+                tracing::warn!("transcribe: session superseded before cleanup paste, stopping");
+                return;
             }
 
             // cleanup pass. with the toggle on the loop above only accumulated
@@ -519,15 +558,21 @@ fn ensure_cleanup_model(slot: &Arc<Mutex<Option<Arc<CleanupModel>>>>) -> Result<
     Ok(model)
 }
 
-/// run a 30 s watchdog on a background thread. if the app state has not
-/// returned to idle by the deadline the transcribe or paste path is wedged.
-/// the watchdog resets to idle, hides the indicator, and emits a stuck
-/// error so the ui can banner the user. it only fires for the session it was
-/// armed in (generation guard) and never for Recording, which can only belong
-/// to a newer session since the watchdog is armed once already in Transcribing.
-fn spawn_watchdog(app: AppHandle, shared_state: Arc<SharedState>, generation: u64) {
+/// run a watchdog on a background thread. if the app state has not returned to
+/// idle by the deadline the transcribe or paste path is wedged. the watchdog
+/// resets to idle, hides the indicator, and emits a stuck error so the ui can
+/// banner the user. it only fires for the session it was armed in (generation
+/// guard) and never for Recording, which can only belong to a newer session
+/// since the watchdog is armed once already in Transcribing. the timeout scales
+/// with chunk count so a long recording is not killed mid paste.
+fn spawn_watchdog(
+    app: AppHandle,
+    shared_state: Arc<SharedState>,
+    generation: u64,
+    timeout: std::time::Duration,
+) {
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(30));
+        std::thread::sleep(timeout);
         let current = shared_state.get();
         if shared_state.generation() == generation
             && matches!(current, AppState::Transcribing | AppState::Pasting)

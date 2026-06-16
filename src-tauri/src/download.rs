@@ -13,11 +13,12 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::fmt::Write as FmtWrite;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// one downloadable file. `filename` is a flat name written directly under the
 /// model directory. `sha256` is the expected lowercase hex digest. the
@@ -107,7 +108,14 @@ pub fn delete_assets(dir: &Path, assets: &[Asset]) -> Result<()> {
     }
     let mut errors: Vec<String> = Vec::new();
     for asset in assets {
-        for path in [dir.join(asset.filename), dir.join(format!("{}.partial", asset.filename))] {
+        // partial_path uses with_extension, which for a name like
+        // model.onnx_data yields model.partial. cover the {name}.partial form
+        // too so neither naming leaves an orphan behind.
+        for path in [
+            dir.join(asset.filename),
+            partial_path(dir, asset),
+            dir.join(format!("{}.partial", asset.filename)),
+        ] {
             if path.exists() {
                 if let Err(e) = std::fs::remove_file(&path) {
                     let msg = format!("rm {}: {e}", path.display());
@@ -140,13 +148,24 @@ pub async fn download_assets(
 ) -> Result<()> {
     std::fs::create_dir_all(dir).with_context(|| format!("create {}", dir.display()))?;
 
-    let client = reqwest::Client::builder().user_agent("Mumble/0.1").build()?;
+    let client = reqwest::Client::builder()
+        .user_agent("Mumble/0.1")
+        .build()?;
 
-    // bytes already on disk from a prior partial run count toward the bar.
+    // bytes already on disk count toward the bar: both fully fetched final
+    // files and any leftover .partial files from an interrupted run that we
+    // are about to resume.
     let mut aggregate_downloaded: u64 = assets
         .iter()
-        .filter_map(|a| std::fs::metadata(dir.join(a.filename)).ok())
-        .map(|m| m.len())
+        .map(|a| {
+            let final_len = std::fs::metadata(dir.join(a.filename))
+                .map(|m| m.len())
+                .unwrap_or(0);
+            let partial_len = std::fs::metadata(partial_path(dir, a))
+                .map(|m| m.len())
+                .unwrap_or(0);
+            final_len + partial_len
+        })
         .sum();
 
     for asset in assets {
@@ -154,18 +173,26 @@ pub async fn download_assets(
         if out_path.exists() {
             continue;
         }
+        // bytes from a leftover .partial for this asset are already folded into
+        // aggregate_downloaded above. subtract them so the base we hand to
+        // download_one excludes this asset, then add back the final written
+        // size once it returns. that keeps the bar monotonic across a resume.
+        let resumed = std::fs::metadata(partial_path(dir, asset))
+            .map(|m| m.len())
+            .unwrap_or(0);
+        let aggregate_base = aggregate_downloaded.saturating_sub(resumed);
         let written = download_one(
             app,
             &client,
             asset,
             &out_path,
             event_name,
-            aggregate_downloaded,
+            aggregate_base,
             aggregate_total,
             cancel.as_ref(),
         )
         .await?;
-        aggregate_downloaded += written;
+        aggregate_downloaded = aggregate_base + written;
     }
 
     Ok(())
@@ -182,29 +209,72 @@ async fn download_one(
     aggregate_total: u64,
     cancel: Option<&CancelFlag>,
 ) -> Result<u64> {
-    let resp = client
-        .get(asset.url)
+    let tmp_path = out_path.with_extension("partial");
+
+    // resume from a leftover .partial if one survived an interrupted run. we
+    // ask the server for the rest of the file via a Range header and re seed
+    // the hasher with the existing bytes so the final digest still covers the
+    // whole file. a 0 length partial is treated as a fresh download.
+    let mut resume_from = std::fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
+    let mut hasher = Sha256::new();
+    if resume_from > 0 {
+        reseed_hasher(&tmp_path, &mut hasher)
+            .await
+            .with_context(|| format!("reseed hasher from {}", tmp_path.display()))?;
+    }
+
+    let mut request = client.get(asset.url);
+    if resume_from > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
+    }
+    let resp = request
         .send()
         .await
         .with_context(|| format!("GET {}", asset.url))?
         .error_for_status()?;
-    let total = resp.content_length().unwrap_or(0);
 
-    let tmp_path = out_path.with_extension("partial");
-    let mut file = tokio::fs::File::create(&tmp_path).await?;
+    // the server may ignore our Range and send the whole file (200). in that
+    // case fall back to a clean restart: drop the resumed state, truncate, and
+    // hash from zero. a 206 means the range was honoured and we append.
+    let resuming = resume_from > 0 && resp.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    if resume_from > 0 && !resuming {
+        tracing::info!(
+            file = asset.filename,
+            "server did not honour Range, restarting download from scratch"
+        );
+        resume_from = 0;
+        hasher = Sha256::new();
+    }
+
+    // content_length on a 206 is just the remaining bytes, so add back what we
+    // already have to report the true total size.
+    let total = resp.content_length().unwrap_or(0) + resume_from;
+
+    let mut file = if resuming {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&tmp_path)
+            .await?
+    } else {
+        tokio::fs::File::create(&tmp_path).await?
+    };
+
     let mut stream = resp.bytes_stream();
-    let mut downloaded: u64 = 0;
-    let mut last_emit: u64 = 0;
-    let mut hasher = Sha256::new();
+    let mut downloaded: u64 = resume_from;
+    let mut last_emit: u64 = resume_from;
 
     while let Some(chunk) = stream.next().await {
         if let Some(flag) = cancel {
             if flag.is_cancelled() {
+                // an explicit cancel is the one case where we discard the
+                // partial. the user asked to stop, not to pause.
                 drop(file);
                 let _ = tokio::fs::remove_file(&tmp_path).await;
                 anyhow::bail!("download cancelled");
             }
         }
+        // on a transport error keep the .partial on disk so the next attempt
+        // can resume instead of refetching from zero.
         let chunk = chunk?;
         file.write_all(&chunk).await?;
         hasher.update(&chunk);
@@ -232,7 +302,9 @@ async fn download_one(
     drop(file);
 
     // verify the digest before promoting the partial file. a mismatch deletes
-    // the partial and bails so a corrupt or swapped asset never gets used.
+    // the partial and bails so a corrupt or swapped asset never gets used. the
+    // partial is removed here (not kept) because resuming a corrupt file would
+    // never converge.
     if asset.sha256 != "SKIP" {
         let got = hex_encode(&hasher.finalize());
         if !got.eq_ignore_ascii_case(asset.sha256) {
@@ -264,10 +336,32 @@ async fn download_one(
     Ok(downloaded)
 }
 
+/// sibling .partial path for an asset's final file.
+fn partial_path(dir: &Path, asset: &Asset) -> std::path::PathBuf {
+    dir.join(asset.filename).with_extension("partial")
+}
+
+/// feed the existing .partial bytes through the hasher so a resumed download
+/// still finalizes the digest of the whole file. reads in fixed buffers so a
+/// 2 gb partial does not balloon memory.
+async fn reseed_hasher(path: &Path, hasher: &mut Sha256) -> Result<()> {
+    let mut file = tokio::fs::File::open(path).await?;
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = file.read(&mut buf).await?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(())
+}
+
 fn hex_encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);
     for b in bytes {
-        out.push_str(&format!("{b:02x}"));
+        // write! into the buffer avoids the per byte format! heap allocation.
+        let _ = write!(out, "{b:02x}");
     }
     out
 }

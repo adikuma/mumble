@@ -16,7 +16,6 @@ use crate::hotkey::{CaptureError, HotkeyListener};
 use crate::model_download;
 use crate::pipeline::Pipeline;
 use crate::settings::{Settings, SettingsStore};
-use crate::state::AppState;
 
 fn err(e: anyhow::Error) -> String {
     format!("{e:#}")
@@ -211,13 +210,6 @@ pub async fn capture_hotkey(listener: State<'_, HotkeyListener>) -> Result<Strin
     })
 }
 
-/// read the current pipeline `AppState`. side effect free. matches the
-/// `mumble://state-changed` event the pipeline emits on every transition.
-#[tauri::command]
-pub fn get_state(pipeline: State<'_, Arc<Pipeline>>) -> AppState {
-    pipeline.state.get()
-}
-
 /// poll the live audio level from the capture worker. returns 0.0 when no
 /// capture is active. side effect free. matches no emit (the indicator
 /// polls this on a timer).
@@ -244,13 +236,6 @@ pub fn list_history(
 #[tauri::command]
 pub fn delete_transcript(history: State<'_, HistoryStore>, id: String) -> Result<(), String> {
     history.delete(&id).map_err(err)
-}
-
-/// clear all transcripts. side effect: truncates the transcripts table.
-/// matches no emit.
-#[tauri::command]
-pub fn clear_history(history: State<'_, HistoryStore>) -> Result<(), String> {
-    history.clear().map_err(err)
 }
 
 /// copy one transcript's text to the system clipboard. side effect: writes
@@ -282,34 +267,29 @@ pub fn repaste_transcript(
     pipeline.paste_client.paste_text(&t.text).map_err(err)
 }
 
-/// hide the main webview window. side effect: window visibility flips off.
-/// matches no emit.
+/// re fetch the parakeet model from huggingface into `models/parakeet/`.
+/// downloads into a staging dir and only swaps it over the working model once
+/// every asset is verified, so a failed refetch leaves the existing model
+/// intact rather than bricking the core asr. refuses to start if another model
+/// download is already running. side effect: writes the parakeet directory.
+/// matches `mumble://download-progress` events emitted while bytes are streaming.
 #[tauri::command]
-pub fn hide_main_window(app: AppHandle) {
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.hide();
-    }
-}
-
-/// show and focus the main webview window. side effect: window visibility
-/// and focus flip on. matches no emit.
-#[tauri::command]
-pub fn show_main_window(app: AppHandle) {
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.show();
-        let _ = win.set_focus();
-    }
-}
-
-/// delete the cached parakeet files and re fetch them from huggingface into
-/// `models/parakeet/`. side effect: writes the parakeet directory. matches
-/// `mumble://download-progress` events emitted while bytes are streaming.
-#[tauri::command]
-pub async fn download_parakeet_model(app: AppHandle) -> Result<(), String> {
+pub async fn download_parakeet_model(
+    app: AppHandle,
+    active: State<'_, ActiveDownload>,
+) -> Result<(), String> {
     let dir = crate::paths::parakeet_dir().map_err(err)?;
-    model_download::delete_model(&dir).map_err(err)?;
-    model_download::ensure_model(&app, dir).await.map_err(err)?;
-    Ok(())
+
+    // claim the shared download slot so a concurrent parakeet or cleanup
+    // download cannot race into the same model files. clone off the State so
+    // we do not hold it across the await.
+    let active = active.inner().clone();
+    let Some(_cancel) = active.try_begin() else {
+        return Err("a model download is already in progress".into());
+    };
+    let result = model_download::refetch_model(&app, &dir).await;
+    active.clear();
+    result.map_err(err)
 }
 
 /// describe whether the parakeet assets are present, plus their on disk path
@@ -502,42 +482,6 @@ pub fn add_dictionary_entry(
     }
     history
         .add_dictionary_entry(pattern.trim(), replacement.trim(), case_sensitive, fuzzy)
-        .map_err(err)
-}
-
-/// update an existing dictionary entry in place. side effect: writes the
-/// dictionary table. matches no emit.
-#[tauri::command]
-pub fn update_dictionary_entry(
-    history: State<'_, HistoryStore>,
-    id: i64,
-    pattern: String,
-    replacement: String,
-    case_sensitive: bool,
-    fuzzy: bool,
-) -> Result<(), String> {
-    if pattern.len() > DICT_FIELD_MAX_BYTES {
-        return Err(format!(
-            "dictionary pattern too large ({} bytes, max {})",
-            pattern.len(),
-            DICT_FIELD_MAX_BYTES
-        ));
-    }
-    if replacement.len() > DICT_FIELD_MAX_BYTES {
-        return Err(format!(
-            "dictionary replacement too large ({} bytes, max {})",
-            replacement.len(),
-            DICT_FIELD_MAX_BYTES
-        ));
-    }
-    history
-        .update_dictionary_entry(
-            id,
-            pattern.trim(),
-            replacement.trim(),
-            case_sensitive,
-            fuzzy,
-        )
         .map_err(err)
 }
 
