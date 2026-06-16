@@ -4,6 +4,21 @@ Continual log of bug fixes, design decisions, and learnings. Newest entries on t
 
 ---
 
+## 2026-06-17: mockup/insights-brutalist - insights backend single source of truth
+
+### Problem
+The insights page mixed two data sources that disagreed on screen. headline numbers came from backend `insights()` using a rolling now minus N days cutoff over the full table, while the chart, heatmap, streak, pace, fastest and sparklines were derived client side from a 500 row capped, calendar day bucketed store slice. different windows and different data, so they did not match (worst in Today view and past 500 lifetime dictations). other bugs: "time saved" was raw seconds spoken (grows the more you talk, backwards), `fastestWpm` had no floor so tiny clips reported impossible speeds (1514 wpm seen live), new users saw flat zero charts instead of an empty state, `avg_latency` used integer division, top words dropped digits and lacked contraction stopwords.
+
+### Fix
+Rewrote `history.rs insights(range_days)` to compute everything the page needs over the full table with local calendar day boundaries (chrono `Local`). it now returns summary plus series (24 hourly buckets for day, N daily zero filled buckets otherwise), heatmap (7x24 Mon first), streak, pace and fastest. time saved is now real saved time: sum of max(0, wordCount/40*60 minus durationSec) versus a 40 wpm typing baseline. fastest ignores clips under 0.5s. avg latency uses f64 then rounds. top words keep digits (trim only outer punctuation, allow alphanumerics) and a contraction stopword list was added. the bucketing, heatmap remap and streak logic were ported 1:1 from the old `insights-derive.ts`.
+
+`InsightsView.tsx` now renders entirely from the backend response (removed the client useMemo recomputes), with a real empty state when sessions is 0. `insights-derive.ts` was slimmed to range plumbing and presentation helpers only (Range, rangeToDays, rangeLabel, sparkPoints) and re-exports Bucket/HourHeat from tauri.ts which now owns those types.
+
+### Learnings
+- a unit test in history.rs asserts headline words equals the sum of the series bucket words for both day and week ranges. cheap guard that the chart and headline read the same source.
+- stats.ts still owns avgWpm/currentStreakDays/wordsToday for HomeView, so those were left untouched. only the insights page moved to the backend.
+- `is_none_or` (Rust 1.82+) reads cleaner than `map_or(true, ...)` for the fastest comparison.
+
 ## 2026-06-14: mockup/insights-brutalist - cleanup model inference wired (ort + tokenizer)
 
 ### What

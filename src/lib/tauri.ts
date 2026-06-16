@@ -80,12 +80,32 @@ export interface TopEntry {
   count: number;
 }
 
+/** one point on the trend axis (a day, or an hour for the Day range). */
+export interface Bucket {
+  label: string;
+  words: number;
+  dictations: number;
+  durationSec: number;
+  wpm: number | null;
+  latencyMs: number | null;
+}
+
+export interface HourHeat {
+  matrix: number[][]; // 7 rows (Mon..Sun) x 24 cols (0..23), dictation counts
+  max: number;
+}
+
 export interface InsightsData {
   words: number;
   sessions: number;
   avgLatencyMs: number | null;
   timeSavedSec: number;
   topWords: TopEntry[];
+  series: Bucket[];
+  heatmap: HourHeat;
+  streak: number;
+  pace: number | null;
+  fastest: number | null;
 }
 
 export const isTauri = (): boolean =>

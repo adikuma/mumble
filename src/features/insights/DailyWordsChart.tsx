@@ -25,7 +25,10 @@ export function DailyWordsChart({ series }: { series: Bucket[] }) {
   const line =
     n > 0
       ? words
-          .map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`)
+          .map(
+            (v, i) =>
+              `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`,
+          )
           .join(" ")
       : "";
   const area =

@@ -43,10 +43,7 @@ export function HourHeatmap({ data }: { data: HourHeat }) {
       <div className="inline-block">
         <div className="flex gap-2">
           {/* weekday labels */}
-          <div
-            className="flex shrink-0 flex-col"
-            style={{ gap: `${GAP}px` }}
-          >
+          <div className="flex shrink-0 flex-col" style={{ gap: `${GAP}px` }}>
             {ROWS.map((r) => (
               <span
                 key={r}

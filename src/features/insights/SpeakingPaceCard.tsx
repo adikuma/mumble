@@ -19,7 +19,9 @@ export function SpeakingPaceCard({
           <div className="text-stat leading-none font-semibold tabular-nums">
             {wpm ?? DASH}
           </div>
-          <div className="text-muted-foreground mt-1.5 text-sm">words / min</div>
+          <div className="text-muted-foreground mt-1.5 text-sm">
+            words / min
+          </div>
         </div>
       </div>
 

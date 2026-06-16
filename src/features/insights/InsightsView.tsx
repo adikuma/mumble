@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  getInsights,
-  isTauri,
-  type InsightsData,
-} from "@/lib/tauri";
+import { BarChart3 } from "lucide-react";
+import { getInsights, isTauri, type InsightsData } from "@/lib/tauri";
 import { useMumbleStore } from "@/store";
 import { BarList } from "@/components/kit/bar-list";
-import { AppGrid, CardHeader, Page, PageHeader, Surface } from "@/components/kit/layout";
-import { avgWpm, currentStreakDays, fastestWpm } from "@/lib/stats";
+import {
+  AppGrid,
+  CardHeader,
+  Page,
+  PageHeader,
+  Surface,
+} from "@/components/kit/layout";
+import { formatHotkey } from "@/lib/utils";
 import { useNow } from "@/lib/use-now";
 import {
-  buildSeries,
-  hourWeekdayBuckets,
   rangeLabel,
   rangeToDays,
   sparkPoints,
@@ -40,15 +41,18 @@ const PERIOD_WORD: Record<Range, string> = {
 
 export function InsightsView() {
   const transcripts = useMumbleStore((s) => s.transcripts);
+  const settings = useMumbleStore((s) => s.settings);
   const [range, setRange] = useState<Range>("week");
   const [data, setData] = useState<InsightsData | null>(null);
 
   const days = rangeToDays(range);
-  // ticking clock so day buckets and labels do not freeze at the mount-time
-  // boundary in the always-mounted tray window.
+  // ticking clock so the date label does not freeze at the mount-time
+  // boundary in the always-mounted tray window. the heavy aggregation is now
+  // backend owned, so this only drives the header label.
   const nowMs = useNow(60_000);
   const now = useMemo(() => new Date(nowMs), [nowMs]);
   const label = rangeLabel(range, now);
+  const hotkey = formatHotkey(settings?.hotkey ?? "Right Alt");
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -66,26 +70,13 @@ export function InsightsView() {
 
   const empty = !data || data.sessions === 0;
 
-  const series = useMemo(
-    () => buildSeries(transcripts, range, now),
-    [transcripts, range, now],
-  );
-  const streak = useMemo(
-    () => currentStreakDays(transcripts, now),
-    [transcripts, now],
-  );
-  const pace = useMemo(
-    () => avgWpm(transcripts, days, now),
-    [transcripts, days, now],
-  );
-  const fastest = useMemo(
-    () => fastestWpm(transcripts, days, now),
-    [transcripts, days, now],
-  );
-  const heat = useMemo(
-    () => hourWeekdayBuckets(transcripts, now),
-    [transcripts, now],
-  );
+  // everything below reads straight from the backend response so the headline,
+  // chart, heatmap, streak and pace can never disagree on screen.
+  const series = data?.series ?? [];
+  const heat = data?.heatmap ?? { matrix: [], max: 0 };
+  const streak = data?.streak ?? 0;
+  const pace = data?.pace ?? null;
+  const fastest = data?.fastest ?? null;
 
   const words = data?.words ?? 0;
   const sessions = data?.sessions ?? 0;
@@ -93,40 +84,62 @@ export function InsightsView() {
   const latency = data?.avgLatencyMs ?? null;
   const topWords = (data?.topWords ?? []).slice(0, 6);
 
+  if (empty) {
+    return (
+      <Page className="max-w-[960px]">
+        <PageHeader
+          title="Insights"
+          description="Your dictation stats will appear here."
+          actions={<RangeToggle value={range} onChange={setRange} />}
+        />
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <BarChart3
+            className="text-muted-foreground/60 size-10"
+            strokeWidth={1.5}
+          />
+          <p className="text-foreground mt-4 text-base font-medium">
+            Your insights appear after your first dictation
+          </p>
+          <p className="text-muted-foreground mt-2 text-sm">
+            Hold <span className="kbd">{hotkey}</span> to get started.
+          </p>
+        </div>
+      </Page>
+    );
+  }
+
   const summaryStats = [
     {
       label: "Words",
-      value: empty ? DASH : words.toLocaleString(),
+      value: words.toLocaleString(),
       points: sparkPoints(series, "words"),
     },
     {
       label: "Dictations",
-      value: empty ? DASH : String(sessions),
+      value: String(sessions),
       points: sparkPoints(series, "dictations"),
     },
     {
       label: "Time saved",
-      value: empty ? DASH : String(timeSavedMin),
-      unit: empty ? undefined : "min",
+      value: String(timeSavedMin),
+      unit: "min",
       points: sparkPoints(series, "durationSec"),
     },
     {
       label: "Pace",
-      value: empty || pace == null ? DASH : String(pace),
-      unit: empty || pace == null ? undefined : "wpm",
+      value: pace == null ? DASH : String(pace),
+      unit: pace == null ? undefined : "wpm",
       points: sparkPoints(series, "wpm"),
     },
     {
       label: "Latency",
-      value: empty || latency == null ? DASH : String(latency),
-      unit: empty || latency == null ? undefined : "ms",
+      value: latency == null ? DASH : String(latency),
+      unit: latency == null ? undefined : "ms",
       points: sparkPoints(series, "latencyMs"),
     },
   ];
 
-  const subtitle = empty
-    ? "Your dictation stats will appear here."
-    : `${words.toLocaleString()} words across ${sessions} ${sessions === 1 ? "dictation" : "dictations"} ${PERIOD_WORD[range]}.`;
+  const subtitle = `${words.toLocaleString()} words across ${sessions} ${sessions === 1 ? "dictation" : "dictations"} ${PERIOD_WORD[range]}.`;
 
   return (
     <Page className="max-w-[960px]">
@@ -157,9 +170,9 @@ export function InsightsView() {
           <Surface className="p-5">
             <CardHeader title="Speaking pace" />
             <SpeakingPaceCard
-              wpm={empty ? null : pace}
-              fastest={empty ? null : fastest}
-              latencyMs={empty ? null : latency}
+              wpm={pace}
+              fastest={fastest}
+              latencyMs={latency}
             />
           </Surface>
         </AppGrid>
