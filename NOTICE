@@ -15,6 +15,20 @@ Parakeet-TDT-0.6B-v3 (model weights)
          installer.
 
 --------------------------------------------------------------------------------
+Qwen2.5-0.5B (cleanup model weights)
+  Author: Alibaba Cloud
+  License: Apache License 2.0
+  Source: https://huggingface.co/Qwen/Qwen2.5-0.5B
+  Notes: The optional transcript cleanup pass runs a fine-tuned Qwen2.5-0.5B
+         exported to fp32 ONNX. When the user opts in via Settings, Mumble
+         downloads the cleanup model from
+         https://huggingface.co/adikuma/mumble-cleanup into
+         %LOCALAPPDATA%\Mumble\models\cleanup\ and runs it fully offline.
+         Weights are not redistributed inside the Mumble installer. Only the
+         fp32 export ships; the int8 variant was dropped because quantization
+         collapses cleanup quality.
+
+--------------------------------------------------------------------------------
 sherpa-onnx
   Author: k2-fsa contributors
   License: Apache License 2.0
@@ -22,11 +36,22 @@ sherpa-onnx
   Notes: Used via the sherpa-rs Rust bindings.
 
 --------------------------------------------------------------------------------
-ONNX Runtime
+ONNX Runtime (sherpa-onnx)
   Author: Microsoft Corporation
   License: MIT License
   Source: https://github.com/microsoft/onnxruntime
-  Notes: Linked transitively via sherpa-onnx / sherpa-rs at build time.
+  Notes: Linked transitively via sherpa-onnx / sherpa-rs at build time for the
+         Parakeet transcriber.
+
+--------------------------------------------------------------------------------
+ONNX Runtime (onnxruntime.dll, bundled)
+  Author: Microsoft Corporation
+  License: MIT License
+  Source: https://github.com/microsoft/onnxruntime
+  Notes: A modern onnxruntime.dll is bundled next to the executable and loaded
+         dynamically by the ort crate to run the optional cleanup model. It is
+         kept separate from the runtime sherpa-onnx links so the two never
+         conflict.
 
 --------------------------------------------------------------------------------
 Tauri
@@ -39,6 +64,16 @@ ort (Rust ONNX Runtime bindings)
   Author: pyke and contributors
   License: Apache License 2.0
   Source: https://github.com/pykeio/ort
+  Notes: Used with the load-dynamic feature to run the cleanup model against
+         the bundled onnxruntime.dll.
+
+--------------------------------------------------------------------------------
+tokenizers
+  Author: Hugging Face
+  License: Apache License 2.0
+  Source: https://github.com/huggingface/tokenizers
+  Notes: Loads the cleanup model's tokenizer.json to encode and decode prompts
+         for the ONNX inference loop.
 
 --------------------------------------------------------------------------------
 shadcn/ui
@@ -47,17 +82,6 @@ shadcn/ui
   Source: https://github.com/shadcn-ui/ui
   Notes: Primitive components in src/components/ui were adapted from this
          project under the MIT license.
-
---------------------------------------------------------------------------------
-Future component (not yet integrated)
-
-Qwen2.5-0.5B
-  Author: Alibaba Cloud
-  License: Apache License 2.0
-  Source: https://huggingface.co/Qwen/Qwen2.5-0.5B
-  Notes: A cleanup model based on Qwen2.5-0.5B is planned for the
-         models/cleanup pipeline. When integrated it will be redistributed
-         under Apache-2.0 in the same manner as Parakeet above.
 
 --------------------------------------------------------------------------------
 For the full list of transitive Rust and JavaScript dependencies and their

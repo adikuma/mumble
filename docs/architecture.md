@@ -41,8 +41,13 @@ All commands live in `src-tauri/src/commands.rs`. Each is a `#[tauri::command]` 
 | `repaste_transcript`        | Re-run the paste flow against the focused app           |
 | `hide_main_window`          | Hide the main webview                                   |
 | `show_main_window`          | Show and focus the main webview                         |
-| `redownload_model`          | Force a fresh model download                            |
-| `model_status`              | Inspect on-disk model presence and size                 |
+| `download_parakeet_model`   | Force a fresh download of the Parakeet model            |
+| `model_status`              | Inspect on-disk Parakeet model presence and size        |
+| `cleanup_status`            | Report cleanup model presence, size, and free disk      |
+| `download_cleanup_model`    | Download the optional cleanup model                     |
+| `cancel_cleanup_download`   | Signal an in-flight cleanup download to stop            |
+| `delete_cleanup_model`      | Delete the cached cleanup model from disk               |
+| `reveal_models_dir`         | Open the models directory in the OS file browser        |
 | `get_insights`              | Aggregated stats for the insights view                  |
 | `get_app_icon`              | Return a base64 PNG of an exe's icon                    |
 | `list_dictionary`           | List user dictionary entries                            |
@@ -60,7 +65,8 @@ Events flow the other direction. The backend emits the following on the global T
 | `mumble://chunk-progress`   | `pipeline.rs`                 | `{ chunk, total }`                       |
 | `mumble://error`            | `pipeline.rs`, `lib.rs`       | `{ message }` or `{ kind, ... }`         |
 | `mumble://ready`            | `lib.rs`                      | `{ ready: bool }`                        |
-| `mumble://download-progress`| `model_download.rs`           | `{ name, received, total }`              |
+| `mumble://download-progress`| `download.rs` (Parakeet)      | `{ filename, downloaded, total, aggregateDownloaded, aggregateTotal, done }` |
+| `mumble://cleanup-download-progress` | `download.rs` (cleanup) | `{ filename, downloaded, total, aggregateDownloaded, aggregateTotal, done }` |
 | `mumble://settings-changed` | `tray.rs`                     | empty                                    |
 
 ## Data directories
@@ -89,4 +95,4 @@ A single push-to-talk cycle touches almost every module in the backend.
 
 ## Frontend overview
 
-The webview UI is a single Vite + React 19 SPA with two roots: the main window (history, settings, insights, dictionary) and the indicator window. State is held in a single Zustand store (`src/store.ts`) and synced to backend events via `src/lib/useBackendBridge.ts`. Theming uses `next-themes` with light/dark CSS variables defined in `src/index.css`. Component primitives live in `src/components/ui/` (shadcn-style) and are composed by feature modules under `src/features/`.
+The webview UI is a single Vite + React 19 SPA with two roots: the main window (history, settings, insights, dictionary) and the indicator window. State is held in a single Zustand store (`src/store.ts`) and synced to backend events via `src/lib/useBackendBridge.ts`. Theming uses a hand-rolled provider in `src/components/theme-provider.tsx` with light/dark CSS variables defined in `src/index.css`. Component primitives live in `src/components/ui/` (shadcn-style) and are composed by feature modules under `src/features/`.

@@ -16,6 +16,13 @@ export default defineConfig(async () => ({
     },
   },
   clearScreen: false,
+  // vitest picks up this block. globals so describe/it/expect are ambient and
+  // node env since these are pure logic tests with no dom.
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["src/**/*.test.ts"],
+  },
   server: {
     port: 1420,
     strictPort: true,

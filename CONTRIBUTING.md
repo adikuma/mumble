@@ -66,7 +66,9 @@ The bench harness uses [`uv`](https://docs.astral.sh/uv/) rather than `pip`. Do 
 
 ## The cleanup model
 
-The directory `models/cleanup/` contains scaffolding for an in-progress LLM-based transcript cleanup pass. The Python scripts under `models/cleanup/scripts/` and the package under `models/cleanup/src/cleanup/` are **not** wired into the runtime yet. Treat anything in that subtree as a moving target and coordinate before changing it.
+The optional LLM-based transcript cleanup pass is **live** in the runtime. Inference is implemented in Rust under `src-tauri/src/cleanup_infer.rs` and `src-tauri/src/cleanup_model.rs`, gated behind the opt-in `cleanupEnabled` setting.
+
+The directory `models/cleanup/` is a separate concern: it holds the Python **training and export** pipeline that produces the ONNX model the runtime downloads. The scripts under `models/cleanup/scripts/` and the package under `models/cleanup/src/cleanup/` are scaffolding, not part of the shipped app. Treat that subtree as a moving target and coordinate before changing it.
 
 ## Pull request checklist
 

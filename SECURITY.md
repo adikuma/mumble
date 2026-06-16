@@ -4,7 +4,7 @@
 
 Please report security issues privately. Do **not** open a public GitHub issue.
 
-- Email: `security@<TBD>` (TODO: replace with a real disclosure address before publishing the repo)
+- Use GitHub's private vulnerability reporting: go to the [Security tab](https://github.com/adikuma/mumble/security) of `github.com/adikuma/mumble` and choose **Report a vulnerability**. This opens a private advisory visible only to you and the maintainers.
 - Include: affected version or commit, reproduction steps, impact assessment, and any proof-of-concept.
 
 We will acknowledge your report within **7 days** and aim to ship a fix or publish a coordinated disclosure within **30 days** of acknowledgement. If we need more time we will say so in writing.

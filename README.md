@@ -4,12 +4,12 @@ A Hex-style push-to-talk voice dictation app for Windows. Hold a hotkey, speak, 
 
 Written in Rust (Tauri backend) + React (webview UI). ASR runs through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) on [Parakeet-TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3).
 
-> **Status:** milestone 2 — full backend landed. Hotkey listener, WASAPI capture with pre-roll ring buffer, Parakeet-TDT transcription, clipboard-safe paste, SQLite history, system tray, floating mic indicator, settings persistence, model auto-download. Requires Windows to run end-to-end.
+> **Status:** milestone 2 — full backend landed. Hotkey listener, WASAPI capture with pre-roll ring buffer, Parakeet-TDT transcription, clipboard-safe paste, SQLite history, system tray, floating mic indicator, settings persistence, model auto-download, plus an optional on-device cleanup pass that polishes the raw transcript before paste. Requires Windows to run end-to-end.
 
 ## Stack
 
 - **Backend:** Rust, Tauri 2, cpal (WASAPI), rdev (low-level keyboard hook), sherpa-onnx, arboard, enigo, rusqlite, tokio.
-- **Frontend:** React 19, TypeScript, Vite 7, Tailwind CSS 4, shadcn/ui-style primitives, Radix primitives, Framer Motion, Zustand, Sonner, Lucide icons.
+- **Frontend:** React 19, TypeScript, Vite 7, Tailwind CSS 4, shadcn/ui-style primitives, Radix primitives, Zustand, Sonner, Lucide icons.
 
 ## Prerequisites
 
@@ -22,6 +22,12 @@ Written in Rust (Tauri backend) + React (webview UI). ASR runs through [sherpa-o
 ## First run
 
 The first time you launch Mumble it downloads the int8 Parakeet model (about 670 MB) from `huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` into `%LOCALAPPDATA%\Mumble\models\`. Subsequent launches are fully offline.
+
+## Cleanup model (optional)
+
+Mumble can run a second on-device model that polishes the raw dictation before it pastes: it strips fillers ("um", "uh", "like"), fixes punctuation, and corrects casing. It is off by default and opt-in from the Models panel in Settings.
+
+When enabled, Mumble downloads a fine-tuned Qwen2.5-0.5B cleanup model (~1.98 GB, fp32 ONNX) from `huggingface.co/adikuma/mumble-cleanup` into `%LOCALAPPDATA%\Mumble\models\cleanup\`. It needs roughly 2 GB of RAM at inference and, like Parakeet, runs fully offline once downloaded. Only the fp32 export is shipped — the int8 variant was dropped because quantization collapses cleanup quality.
 
 ## Dev
 
